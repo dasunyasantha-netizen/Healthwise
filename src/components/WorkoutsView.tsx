@@ -444,8 +444,8 @@ function SessionRunner({ session, onClose, onComplete }: {
     };
 
     return (
-        <div className="modal-overlay" style={{ alignItems: 'flex-start' }}>
-            <div style={{ background: 'var(--color-surface)', width: '100%', height: '100dvh', overflow: 'auto', padding: '20px 16px 100px' }}>
+        <div className="modal-overlay" style={{ alignItems: 'flex-start', overflowY: 'auto' }}>
+            <div style={{ background: 'var(--color-surface)', width: '100%', minHeight: '100%', padding: '20px 16px 40px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={20} /></button>
                     <div style={{ flex: 1 }}>

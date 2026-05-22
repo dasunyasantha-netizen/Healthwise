@@ -64,11 +64,11 @@ function MeasurementForm({ onClose, onSaved, editing }: { onClose: () => void; o
     );
 
     return (
-        <div className="modal-overlay" style={{ alignItems: 'flex-start' }}>
+        <div className="modal-overlay" style={{ alignItems: 'flex-start', overflowY: 'auto' }}>
             <div style={{
                 background: 'var(--color-surface)', width: '100%',
-                minHeight: '100dvh', overflow: 'auto', padding: '20px 16px 100px',
-                borderRadius: 0
+                minHeight: '100%', padding: '20px 16px 40px',
+                borderRadius: 0, flexShrink: 0
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                     <h2>{editing ? 'Edit Measurements' : 'Log Measurements'}</h2>
