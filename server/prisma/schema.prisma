@@ -1,0 +1,252 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  handle    String?
+  phone     String?
+  avatarUrl String?
+  height    Float?   // cm — used for BMI calculation
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings         Settings?
+  exercises        Exercise[]         @relation("UserCreatedExercises")
+  workoutPlans     WorkoutPlan[]
+  workoutSessions  WorkoutSession[]
+  mealLogs         MealLog[]
+  fastingSessions  FastingSession[]
+  habits           Habit[]
+  habitCompletions HabitCompletion[]
+  measurements     HealthMeasurement[]
+}
+
+model Settings {
+  id                  String  @id @default(uuid())
+  userId              String  @unique
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications       Boolean @default(true)
+  measurementUnit     String  @default("metric") // metric | imperial
+  weightUnit          String  @default("kg")
+  measurementReminderDays Int @default(14)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─── EXERCISE LIBRARY ────────────────────────────────────────────────────────
+
+model Exercise {
+  id               String   @id @default(uuid())
+  name             String
+  category         String   // Chest, Back, Shoulders, etc.
+  primaryMuscle    String
+  secondaryMuscles String[]
+  bodyPartFocus    String
+  equipment        String   // barbell, dumbbell, cable, bodyweight, machine, etc.
+  trackingType     String   // reps_weight | time | distance | reps_only
+  demoVideoUrl     String?
+  sourceUrl        String?
+  instructions     String?
+  safetyNotes      String?
+  isSystem         Boolean  @default(false)
+  createdByUserId  String?
+  createdBy        User?    @relation("UserCreatedExercises", fields: [createdByUserId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workoutPlanExercises WorkoutPlanExercise[]
+  workoutExerciseLogs  WorkoutExerciseLog[]
+}
+
+// ─── WORKOUT PLANS ────────────────────────────────────────────────────────────
+
+model WorkoutPlan {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  date       String?  // YYYY-MM-DD — null if template
+  isTemplate Boolean  @default(false)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  exercises WorkoutPlanExercise[]
+  sessions  WorkoutSession[]
+}
+
+model WorkoutPlanExercise {
+  id             String      @id @default(uuid())
+  workoutPlanId  String
+  workoutPlan    WorkoutPlan @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  exerciseId     String
+  exercise       Exercise    @relation(fields: [exerciseId], references: [id])
+  orderIndex     Int         @default(0)
+  targetSets     Int?
+  targetReps     Int?
+  targetWeight   Float?
+  targetTimeSeconds Int?
+  restSeconds    Int?
+  notes          String?
+}
+
+// ─── WORKOUT SESSIONS ─────────────────────────────────────────────────────────
+
+model WorkoutSession {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutPlanId String?
+  workoutPlan   WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
+  date          String      // YYYY-MM-DD
+  startedAt     DateTime    @default(now())
+  endedAt       DateTime?
+  status        String      @default("planned") // planned | in_progress | completed | skipped
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  exerciseLogs WorkoutExerciseLog[]
+}
+
+model WorkoutExerciseLog {
+  id               String         @id @default(uuid())
+  workoutSessionId String
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exerciseId       String
+  exercise         Exercise       @relation(fields: [exerciseId], references: [id])
+  orderIndex       Int            @default(0)
+  completed        Boolean        @default(false)
+  actualTimeSeconds Int?
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  sets WorkoutSetLog[]
+}
+
+model WorkoutSetLog {
+  id                   String             @id @default(uuid())
+  workoutExerciseLogId String
+  workoutExerciseLog   WorkoutExerciseLog @relation(fields: [workoutExerciseLogId], references: [id], onDelete: Cascade)
+  setNumber            Int
+  weight               Float?
+  reps                 Int?
+  timeSeconds          Int?
+  completed            Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+// ─── MEALS ────────────────────────────────────────────────────────────────────
+
+model MealLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String   // YYYY-MM-DD
+  time      String?  // HH:MM
+  mealType  String   // breakfast | lunch | dinner | snack | other
+  foodItems String   // free-text description
+  calories  Float?
+  protein   Float?   // grams
+  carbs     Float?   // grams
+  fat       Float?   // grams
+  waterMl   Float?
+  notes     String?
+  photoUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── FASTING ─────────────────────────────────────────────────────────────────
+
+model FastingSession {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime   DateTime
+  endTime     DateTime?
+  targetHours Float     @default(16)
+  status      String    @default("active") // active | completed | cancelled
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── HABITS / STREAKS ─────────────────────────────────────────────────────────
+
+model Habit {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  frequency        String   @default("daily") // daily | selected_days | weekly
+  selectedDays     Int[]    // 0=Sun … 6=Sat — used when frequency=selected_days
+  targetValue      Float?
+  unit             String?
+  startDate        String   // YYYY-MM-DD
+  reminderTime     String?  // HH:MM
+  motivationMsg    String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  completions HabitCompletion[]
+}
+
+model HabitCompletion {
+  id        String   @id @default(uuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String   // YYYY-MM-DD
+  completed Boolean  @default(false)
+  value     Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([habitId, date])
+}
+
+// ─── HEALTH MEASUREMENTS ─────────────────────────────────────────────────────
+
+model HealthMeasurement {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date              String   // YYYY-MM-DD
+  weight            Float?   // kg
+  waist             Float?   // cm
+  chest             Float?   // cm
+  hip               Float?   // cm
+  neck              Float?   // cm
+  leftArm           Float?   // cm
+  rightArm          Float?   // cm
+  leftThigh         Float?   // cm
+  rightThigh        Float?   // cm
+  bodyFatPercentage Float?   // %
+  bmi               Float?   // calculated or overridden
+  restingHeartRate  Int?     // bpm
+  systolicBp        Int?     // mmHg
+  diastolicBp       Int?     // mmHg
+  spo2              Float?   // %
+  bodyTemperature   Float?   // °C
+  fastingGlucose    Float?   // mmol/L
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
