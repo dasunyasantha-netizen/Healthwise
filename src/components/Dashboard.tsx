@@ -1,8 +1,11 @@
-import { RefreshCw, Dumbbell, UtensilsCrossed, Timer, Plus, Ruler, Flame, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { RefreshCw, Dumbbell, UtensilsCrossed, Timer, Ruler, Flame, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { DashboardData, ViewMode } from '../types';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { DashboardData, HealthMeasurement, ViewMode } from '../types';
 import FastingTimerCard from './FastingTimerCard';
 import CalendarMini from './CalendarMini';
+import { api } from '../services/api';
 
 interface Props {
     data: DashboardData | null;
@@ -27,8 +30,129 @@ function ProgressRing({ value, max, size = 64, stroke = 6, color = 'var(--color-
     );
 }
 
+function MiniChart({ data, dataKey, color, label, unit, referenceVal }: {
+    data: any[]; dataKey: string; color: string; label: string; unit: string; referenceVal?: number;
+}) {
+    if (!data || data.length < 2) return null;
+    const values = data.map(d => d[dataKey]).filter(v => v != null);
+    if (values.length < 2) return null;
+    const latest = values[values.length - 1];
+    const prev = values[values.length - 2];
+    const diff = latest - prev;
+    const diffStr = (diff > 0 ? '+' : '') + diff.toFixed(1);
+    const diffColor = diff === 0 ? 'var(--color-text-3)' : (diff > 0 ? '#ef4444' : '#00c875');
+
+    return (
+        <div className="card" style={{ marginBottom: 14, padding: '14px 16px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div>
+                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 2 }}>
+                        <span style={{ fontSize: '1.375rem', fontWeight: 800 }}>{latest}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{unit}</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: diffColor }}>{diffStr}</span>
+                    </div>
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-3)' }}>
+                    {data.length} entries
+                </div>
+            </div>
+            <ResponsiveContainer width="100%" height={72}>
+                <LineChart data={data} margin={{ top: 2, right: 4, left: -28, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--color-text-3)' }}
+                        tickFormatter={d => d ? d.slice(5) : ''} interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 9, fill: 'var(--color-text-3)' }} domain={['auto', 'auto']} />
+                    {referenceVal && <ReferenceLine y={referenceVal} stroke={color} strokeDasharray="4 3" strokeOpacity={0.4} />}
+                    <Tooltip
+                        contentStyle={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--color-border-light)' }}
+                        labelFormatter={l => l ? String(l).replace(/-/g, '/') : ''}
+                        formatter={(v: any) => [`${v} ${unit}`, label]}
+                    />
+                    <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2.5}
+                        dot={{ r: 3, fill: color, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
+                </LineChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+function BmiGauge({ bmi }: { bmi: number }) {
+    const zones = [
+        { label: 'Under', max: 18.5, color: '#60a5fa' },
+        { label: 'Normal', max: 25, color: '#00c875' },
+        { label: 'Over', max: 30, color: '#f59e0b' },
+        { label: 'Obese', max: 40, color: '#ef4444' },
+    ];
+    const clamp = Math.min(Math.max(bmi, 14), 40);
+    const pct = ((clamp - 14) / (40 - 14)) * 100;
+    const zone = zones.find(z => bmi < z.max) ?? zones[zones.length - 1];
+
+    return (
+        <div className="card" style={{ marginBottom: 14, padding: '14px 16px 12px' }}>
+            <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>BMI</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: '1.375rem', fontWeight: 800 }}>{bmi.toFixed(1)}</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: zone.color }}>{zone.label}</span>
+            </div>
+            <div style={{ position: 'relative', height: 10, borderRadius: 6, overflow: 'hidden', background: 'linear-gradient(to right, #60a5fa 0%, #00c875 35%, #f59e0b 65%, #ef4444 100%)' }}>
+                <div style={{
+                    position: 'absolute', top: -2, left: `${pct}%`, transform: 'translateX(-50%)',
+                    width: 14, height: 14, borderRadius: '50%',
+                    background: '#fff', border: `3px solid ${zone.color}`,
+                    boxShadow: '0 1px 4px rgba(0,0,0,.2)'
+                }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                {['14', '18.5', '25', '30', '40'].map(v => (
+                    <span key={v} style={{ fontSize: '0.625rem', color: 'var(--color-text-3)' }}>{v}</span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function BpCard({ systolic, diastolic }: { systolic: number; diastolic: number }) {
+    const classify = () => {
+        if (systolic < 120 && diastolic < 80) return { label: 'Normal', color: '#00c875' };
+        if (systolic < 130 && diastolic < 80) return { label: 'Elevated', color: '#f59e0b' };
+        if (systolic < 140 || diastolic < 90) return { label: 'High Stage 1', color: '#f97316' };
+        return { label: 'High Stage 2', color: '#ef4444' };
+    };
+    const { label, color } = classify();
+    return (
+        <div className="card" style={{ marginBottom: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Blood Pressure</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                    <span style={{ fontSize: '1.375rem', fontWeight: 800 }}>{systolic}</span>
+                    <span style={{ fontSize: '1rem', color: 'var(--color-text-3)' }}>/</span>
+                    <span style={{ fontSize: '1.375rem', fontWeight: 800 }}>{diastolic}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>mmHg</span>
+                </div>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color, background: `${color}18`, padding: '3px 10px', borderRadius: 20 }}>{label}</span>
+            </div>
+        </div>
+    );
+}
+
 export default function Dashboard({ data, loading, onRefresh, onNavigate }: Props) {
     const today = format(new Date(), 'EEEE, MMMM d');
+    const [trends, setTrends] = useState<any[]>([]);
+
+    useEffect(() => {
+        api.measurements.trends().then((t: HealthMeasurement[]) => {
+            setTrends(t.map(m => ({
+                date: m.date,
+                weight: m.weight ?? null,
+                waist: m.waist ?? null,
+                bodyFat: m.bodyFatPercentage ?? null,
+                systolic: m.systolicBp ?? null,
+                diastolic: m.diastolicBp ?? null,
+                hr: m.restingHeartRate ?? null,
+            })));
+        }).catch(() => {});
+    }, []);
 
     if (loading && !data) {
         return (
@@ -52,6 +176,7 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
     const measurement = data?.measurement;
     const workouts = data?.workouts;
     const fasting = data?.fasting;
+    const latest = measurement?.latest;
 
     const motivationalMsg = (() => {
         if (!data) return "Let's make today count!";
@@ -63,6 +188,8 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
         if (habits?.total === 0) return "Add your first habit and start building your streak today.";
         return "Every rep, every meal, every day — it all adds up. Let's go!";
     })();
+
+    const hasCharts = trends.length >= 2;
 
     return (
         <div className="page">
@@ -117,7 +244,7 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
                 </div>
             </div>
 
-            {/* Fasting timer — always shown so user can start a fast from dashboard */}
+            {/* Fasting timer */}
             <div style={{ marginBottom: 16 }}>
                 <FastingTimerCard session={fasting ?? null} onNavigate={() => onNavigate('meals')} />
             </div>
@@ -167,130 +294,6 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
                 </div>
             )}
 
-            {/* Workout summary */}
-            <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Dumbbell size={18} color="#3b82f6" />
-                        <span style={{ fontWeight: 700 }}>Workouts</span>
-                    </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('workouts')}>
-                        <Plus size={14} /> Start
-                    </button>
-                </div>
-                {workouts && workouts.count > 0 ? (
-                    <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                            <div className="stat-box">
-                                <span className="stat-label">Today</span>
-                                <span className="stat-value">{workouts.count}</span>
-                                <span className="stat-unit">sessions</span>
-                            </div>
-                            <div className="stat-box">
-                                <span className="stat-label">Done</span>
-                                <span className="stat-value" style={{ color: 'var(--color-primary)' }}>{workouts.completed}</span>
-                                <span className="stat-unit">completed</span>
-                            </div>
-                            <div className="stat-box">
-                                <span className="stat-label">This week</span>
-                                <span className="stat-value">{data?.weeklyWorkoutCount || 0}</span>
-                                <span className="stat-unit">workouts</span>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)' }}>
-                        No workouts planned for today. <button className="btn-ghost" onClick={() => onNavigate('workouts')} style={{ fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Log one</button>
-                    </p>
-                )}
-            </div>
-
-            {/* Meal summary */}
-            <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <UtensilsCrossed size={18} color="#f59e0b" />
-                        <span style={{ fontWeight: 700 }}>Nutrition Today</span>
-                    </div>
-                    <button className="btn btn-sm" style={{ background: '#fef3c7', color: '#92400e', border: 'none' }}
-                        onClick={() => onNavigate('meals')}>
-                        <Plus size={14} /> Log
-                    </button>
-                </div>
-                {meals && meals.count > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-                        {[
-                            { label: 'Cal', value: Math.round(meals.calories), unit: 'kcal', color: '#f59e0b' },
-                            { label: 'Protein', value: Math.round(meals.protein), unit: 'g', color: '#3b82f6' },
-                            { label: 'Carbs', value: Math.round(meals.carbs), unit: 'g', color: '#8b5cf6' },
-                            { label: 'Fat', value: Math.round(meals.fat), unit: 'g', color: '#ef4444' },
-                        ].map(s => (
-                            <div key={s.label} className="stat-box">
-                                <span className="stat-label">{s.label}</span>
-                                <span className="stat-value" style={{ fontSize: '1.125rem', color: s.color }}>{s.value}</span>
-                                <span className="stat-unit">{s.unit}</span>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)' }}>No meals logged today.</p>
-                )}
-                {meals && meals.water > 0 && (
-                    <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 'var(--radius-lg)', background: '#eff6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '1rem' }}>💧</span>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e40af' }}>
-                            {meals.water >= 1000 ? `${(meals.water/1000).toFixed(1)}L` : `${meals.water}ml`} water today
-                        </span>
-                    </div>
-                )}
-            </div>
-
-            {/* Measurement reminder */}
-            {measurement && (
-                <div className="card" style={{
-                    marginBottom: 16,
-                    borderColor: measurement.status?.isOverdue ? 'var(--color-warning)' : 'var(--color-border-light)',
-                    background: measurement.status?.isOverdue ? '#fffbeb' : 'var(--color-surface)'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                        <div style={{
-                            width: 40, height: 40, borderRadius: 'var(--radius-lg)', flexShrink: 0,
-                            background: measurement.status?.isOverdue ? '#fef3c7' : 'var(--color-primary-bg)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}>
-                            {measurement.status?.isOverdue
-                                ? <AlertTriangle size={20} color="var(--color-warning)" />
-                                : <Ruler size={20} color="var(--color-primary)" />
-                            }
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, marginBottom: 2 }}>Body Measurements</div>
-                            <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-2)' }}>
-                                {measurement.latest
-                                    ? (measurement.status?.isOverdue
-                                        ? `Overdue by ${measurement.status.overdueDays} day${measurement.status.overdueDays !== 1 ? 's' : ''}`
-                                        : `Next check-in in ${measurement.status?.dueIn} day${measurement.status?.dueIn !== 1 ? 's' : ''}`)
-                                    : 'Add your first measurement'
-                                }
-                            </div>
-                            {measurement.latest && (
-                                <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {measurement.latest.weight && (
-                                        <span className="badge badge-green">{measurement.latest.weight} kg</span>
-                                    )}
-                                    {measurement.latest.bmi && (
-                                        <span className="badge badge-blue">BMI {measurement.latest.bmi}</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <button className="btn btn-sm btn-secondary" onClick={() => onNavigate('measurements')}>
-                            {measurement.latest ? 'Update' : 'Add'}
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* Calendar mini preview */}
             <div style={{ marginBottom: 16 }}>
                 <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -300,6 +303,50 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
                     </button>
                 </div>
                 <CalendarMini onNavigate={() => onNavigate('calendar')} />
+            </div>
+
+            {/* Health Analytics */}
+            <div style={{ marginBottom: 16 }}>
+                <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>Health Analytics</span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('measurements')} style={{ fontSize: '0.75rem' }}>
+                        All data
+                    </button>
+                </div>
+
+                {!hasCharts && !latest ? (
+                    <div className="card" style={{ padding: '24px 20px', textAlign: 'center' }}>
+                        <Ruler size={28} color="var(--color-border)" style={{ margin: '0 auto 10px' }} />
+                        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)', marginBottom: 12 }}>
+                            Log body measurements to see your progress charts here.
+                        </p>
+                        <button className="btn btn-primary btn-sm" style={{ margin: '0 auto' }} onClick={() => onNavigate('measurements')}>
+                            Add measurement
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        {/* BMI gauge from latest */}
+                        {latest?.bmi && <BmiGauge bmi={latest.bmi} />}
+
+                        {/* BP card from latest */}
+                        {latest?.systolicBp && latest?.diastolicBp && (
+                            <BpCard systolic={latest.systolicBp} diastolic={latest.diastolicBp} />
+                        )}
+
+                        {/* Trend charts — only when 2+ entries */}
+                        <MiniChart data={trends} dataKey="weight" color="var(--color-primary)" label="Weight" unit="kg" />
+                        <MiniChart data={trends} dataKey="waist" color="#f59e0b" label="Waist" unit="cm" />
+                        <MiniChart data={trends} dataKey="bodyFat" color="#ef4444" label="Body Fat" unit="%" />
+                        <MiniChart data={trends} dataKey="hr" color="#8b5cf6" label="Resting Heart Rate" unit="bpm" referenceVal={60} />
+
+                        {!hasCharts && latest && (
+                            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-3)', textAlign: 'center', marginTop: 4 }}>
+                                Log a second measurement to see trend charts.
+                            </p>
+                        )}
+                    </>
+                )}
             </div>
 
             <div style={{ height: 8 }} />
