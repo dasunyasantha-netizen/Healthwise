@@ -81,7 +81,7 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
             <div className="card" style={{
                 background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%)',
                 color: '#fff', marginBottom: 16, padding: '16px 20px',
-                border: 'none', boxShadow: '0 4px 16px rgba(5,150,105,.25)'
+                border: 'none', boxShadow: '0 4px 16px rgba(0,115,234,.25)'
             }}>
                 <p style={{ fontSize: '0.9375rem', fontWeight: 600, lineHeight: 1.5 }}>{motivationalMsg}</p>
             </div>

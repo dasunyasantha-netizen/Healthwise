@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
                     name: 'HealthWise',
                     short_name: 'HealthWise',
                     description: 'Personal health tracker for workouts, meals, fasting, habits, and body measurements.',
-                    theme_color: '#059669',
+                    theme_color: '#0073ea',
                     background_color: '#f8fafc',
                     display: 'standalone',
                     orientation: 'portrait',

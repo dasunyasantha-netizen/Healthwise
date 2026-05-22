@@ -180,7 +180,7 @@ function FastingView() {
                         </div>
                     </div>
                     {pct >= 1 && (
-                        <div style={{ marginBottom: 12, padding: '10px', background: '#f0fdf4', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 700 }}>
+                        <div style={{ marginBottom: 12, padding: '10px', background: 'var(--color-primary-bg)', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 700 }}>
                             You've reached your goal!
                         </div>
                     )}

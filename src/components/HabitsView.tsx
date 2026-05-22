@@ -8,7 +8,7 @@ const MILESTONE_BADGES: Record<number, { label: string; color: string }> = {
     3:   { label: '3-day streak',   color: '#f59e0b' },
     7:   { label: '7-day streak',   color: '#3b82f6' },
     14:  { label: '2-week streak',  color: '#8b5cf6' },
-    30:  { label: '30-day streak',  color: '#059669' },
+    30:  { label: '30-day streak',  color: '#0073ea' },
     60:  { label: '60-day streak',  color: '#0ea5e9' },
     100: { label: '100-day streak', color: '#f43f5e' },
 };

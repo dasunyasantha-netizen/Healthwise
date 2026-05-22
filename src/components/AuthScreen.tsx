@@ -9,14 +9,14 @@ export default function AuthScreen({ onLogin }: Props) {
         <div style={{
             minHeight: '100dvh', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', padding: '24px',
-            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #f0fdf4 100%)'
+            background: 'linear-gradient(135deg, #e6f2ff 0%, #dbeafe 50%, #f6f7fb 100%)'
         }}>
             <div style={{ textAlign: 'center', maxWidth: 380, width: '100%' }}>
                 <div style={{
                     width: 72, height: 72, borderRadius: 20,
                     background: 'var(--color-primary)', display: 'flex',
                     alignItems: 'center', justifyContent: 'center',
-                    margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(5,150,105,.3)'
+                    margin: '0 auto 20px', boxShadow: '0 8px 24px rgba(0,115,234,.3)'
                 }}>
                     <Activity size={36} color="#fff" strokeWidth={2.5} />
                 </div>

@@ -22,10 +22,10 @@ export default function CalendarMini({ onNavigate }: Props) {
     }, [year, month]);
 
     const DOT_COLORS: Record<string, string> = {
-        hasWorkout: '#3b82f6',
+        hasWorkout: '#0073ea',
         hasMeal: '#f59e0b',
-        hasFasting: '#8b5cf6',
-        hasHabit: '#059669',
+        hasFasting: '#579bfc',
+        hasHabit: '#00c875',
         hasMeasurement: '#06b6d4',
     };
 

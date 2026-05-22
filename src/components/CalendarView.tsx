@@ -4,10 +4,10 @@ import { format, startOfMonth, getDaysInMonth, getDay, subMonths, addMonths, par
 import { api } from '../services/api';
 
 const DOT_COLORS: Record<string, { color: string; Icon: React.ElementType }> = {
-    hasWorkout:     { color: '#3b82f6', Icon: Dumbbell },
+    hasWorkout:     { color: '#0073ea', Icon: Dumbbell },
     hasMeal:        { color: '#f59e0b', Icon: UtensilsCrossed },
-    hasFasting:     { color: '#8b5cf6', Icon: Timer },
-    hasHabit:       { color: '#059669', Icon: Flame },
+    hasFasting:     { color: '#579bfc', Icon: Timer },
+    hasHabit:       { color: '#00c875', Icon: Flame },
     hasMeasurement: { color: '#06b6d4', Icon: Ruler },
 };
 
@@ -102,7 +102,7 @@ function DayDetailModal({ date, onClose }: { date: string; onClose: () => void }
                     {data.habitCompletions?.length > 0 && (
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontWeight: 700 }}>
-                                <Flame size={16} color="#059669" /> Habits
+                                <Flame size={16} color="#00c875" /> Habits
                             </div>
                             {data.habitCompletions.map((c: any) => (
                                 <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--color-border-light)' }}>
