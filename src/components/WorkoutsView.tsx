@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw } from 'lucide-react';
+import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
@@ -230,18 +230,30 @@ function ExerciseDetailModal({ exercise, onClose }: { exercise: Exercise; onClos
 
 // ─── WORKOUT PLAN BUILDER ─────────────────────────────────────────────────────
 
-function WorkoutPlanBuilder({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void; onSaved: () => void; editing?: WorkoutPlan }) {
     const [exercises, setExercises] = useState<Exercise[]>([]);
     const [selected, setSelected] = useState<{ exercise: Exercise; targetSets: number; targetReps: number; targetWeight: number; targetTimeSeconds: number; restSeconds: number }[]>([]);
-    const [name, setName] = useState('');
-    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-    const [isTemplate, setIsTemplate] = useState(false);
+    const [name, setName] = useState(editing?.name ?? '');
+    const [date, setDate] = useState(editing?.date ?? format(new Date(), 'yyyy-MM-dd'));
+    const [isTemplate, setIsTemplate] = useState(editing?.isTemplate ?? false);
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [step, setStep] = useState<'info' | 'exercises'>('info');
 
     useEffect(() => {
-        api.exercises.list().then(setExercises).catch(() => {});
+        api.exercises.list().then(exList => {
+            setExercises(exList);
+            if (editing?.exercises?.length) {
+                setSelected(editing.exercises.map((pe: any) => ({
+                    exercise: pe.exercise,
+                    targetSets: pe.targetSets ?? 3,
+                    targetReps: pe.targetReps ?? 10,
+                    targetWeight: pe.targetWeight ?? 0,
+                    targetTimeSeconds: pe.targetTimeSeconds ?? 0,
+                    restSeconds: pe.restSeconds ?? 90,
+                })));
+            }
+        }).catch(() => {});
     }, []);
 
     const filtered = exercises.filter(e =>
@@ -267,7 +279,7 @@ function WorkoutPlanBuilder({ onClose, onSaved }: { onClose: () => void; onSaved
         if (!name.trim()) return;
         setSaving(true);
         try {
-            await api.workouts.plans.create({
+            const payload = {
                 name,
                 date: isTemplate ? null : date,
                 isTemplate,
@@ -279,7 +291,12 @@ function WorkoutPlanBuilder({ onClose, onSaved }: { onClose: () => void; onSaved
                     targetTimeSeconds: s.targetTimeSeconds || null,
                     restSeconds: s.restSeconds
                 }))
-            });
+            };
+            if (editing) {
+                await api.workouts.plans.update(editing.id, payload);
+            } else {
+                await api.workouts.plans.create(payload);
+            }
             onSaved();
             onClose();
         } finally { setSaving(false); }
@@ -290,7 +307,7 @@ function WorkoutPlanBuilder({ onClose, onSaved }: { onClose: () => void; onSaved
             <div className="modal-sheet" style={{ maxHeight: '95dvh' }}>
                 <div className="modal-handle" />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <h2>New Workout Plan</h2>
+                    <h2>{editing ? 'Edit Plan' : 'New Workout Plan'}</h2>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>
 
@@ -378,7 +395,7 @@ function WorkoutPlanBuilder({ onClose, onSaved }: { onClose: () => void; onSaved
                             <button className="btn btn-ghost" onClick={() => setStep('info')}>← Back</button>
                             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
                                 onClick={save} disabled={saving || selected.length === 0}>
-                                {saving ? 'Saving...' : 'Save Plan'}
+                                {saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Plan'}
                             </button>
                         </div>
                     </div>
@@ -481,6 +498,7 @@ export default function WorkoutsView() {
     const [sessions, setSessions] = useState<WorkoutSession[]>([]);
     const [exercises, setExercises] = useState<Exercise[]>([]);
     const [showBuilder, setShowBuilder] = useState(false);
+    const [editingPlan, setEditingPlan] = useState<WorkoutPlan | undefined>();
     const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
     const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
     const [search, setSearch] = useState('');
@@ -621,10 +639,14 @@ export default function WorkoutsView() {
                                         <button className="btn btn-secondary btn-sm" onClick={() => startSession(p)}>
                                             <Play size={13} /> Start
                                         </button>
-                                        <button className="btn btn-ghost btn-sm" onClick={async () => {
-                                            await api.workouts.plans.duplicate(p.id, { targetDate: today });
-                                            load();
-                                        }}>Copy</button>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => { setEditingPlan(p); setShowBuilder(true); }}>
+                                            <Pencil size={14} />
+                                        </button>
+                                        <button className="btn btn-ghost btn-icon" onClick={async () => {
+                                            if (confirm('Delete this plan?')) { await api.workouts.plans.delete(p.id); load(); }
+                                        }}>
+                                            <Trash2 size={14} color="var(--color-text-3)" />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -668,7 +690,7 @@ export default function WorkoutsView() {
                 </div>
             )}
 
-            {showBuilder && <WorkoutPlanBuilder onClose={() => setShowBuilder(false)} onSaved={load} />}
+            {showBuilder && <WorkoutPlanBuilder onClose={() => { setShowBuilder(false); setEditingPlan(undefined); }} onSaved={load} editing={editingPlan} />}
             {selectedExercise && <ExerciseDetailModal exercise={selectedExercise} onClose={() => setSelectedExercise(null)} />}
             {activeSession && <SessionRunner session={activeSession} onClose={() => setActiveSession(null)} onComplete={load} />}
         </div>

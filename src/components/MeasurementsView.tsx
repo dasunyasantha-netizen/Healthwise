@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Ruler, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, X, Ruler, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../services/api';
@@ -7,16 +7,21 @@ import { HealthMeasurement } from '../types';
 
 type Tab = 'latest' | 'form' | 'charts';
 
-function MeasurementForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function MeasurementForm({ onClose, onSaved, editing }: { onClose: () => void; onSaved: () => void; editing?: HealthMeasurement }) {
+    const s = (v: number | null | undefined) => v != null ? String(v) : '';
     const [form, setForm] = useState({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        weight: '', height: '',
-        waist: '', chest: '', hip: '', neck: '',
-        leftArm: '', rightArm: '', leftThigh: '', rightThigh: '',
-        bodyFatPercentage: '',
-        restingHeartRate: '', systolicBp: '', diastolicBp: '',
-        spo2: '', bodyTemperature: '', fastingGlucose: '',
-        notes: ''
+        date: editing?.date ?? format(new Date(), 'yyyy-MM-dd'),
+        weight: s(editing?.weight), height: s(editing?.height),
+        waist: s(editing?.waist), chest: s(editing?.chest),
+        hip: s(editing?.hip), neck: s(editing?.neck),
+        leftArm: s(editing?.leftArm), rightArm: s(editing?.rightArm),
+        leftThigh: s(editing?.leftThigh), rightThigh: s(editing?.rightThigh),
+        bodyFatPercentage: s(editing?.bodyFatPercentage),
+        restingHeartRate: s(editing?.restingHeartRate),
+        systolicBp: s(editing?.systolicBp), diastolicBp: s(editing?.diastolicBp),
+        spo2: s(editing?.spo2), bodyTemperature: s(editing?.bodyTemperature),
+        fastingGlucose: s(editing?.fastingGlucose),
+        notes: editing?.notes ?? ''
     });
     const [saving, setSaving] = useState(false);
 
@@ -26,7 +31,7 @@ function MeasurementForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
     const save = async () => {
         setSaving(true);
         try {
-            await api.measurements.create({
+            const payload = {
                 date: form.date,
                 weight: n(form.weight), height: n(form.height),
                 waist: n(form.waist), chest: n(form.chest),
@@ -39,7 +44,12 @@ function MeasurementForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
                 spo2: n(form.spo2), bodyTemperature: n(form.bodyTemperature),
                 fastingGlucose: n(form.fastingGlucose),
                 notes: form.notes || null
-            });
+            };
+            if (editing) {
+                await api.measurements.update(editing.id, payload);
+            } else {
+                await api.measurements.create(payload);
+            }
             onSaved(); onClose();
         } finally { setSaving(false); }
     };
@@ -61,7 +71,7 @@ function MeasurementForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
                 borderRadius: 0
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <h2>Log Measurements</h2>
+                    <h2>{editing ? 'Edit Measurements' : 'Log Measurements'}</h2>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={20} /></button>
                 </div>
 
@@ -108,7 +118,7 @@ function MeasurementForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
                 <button className="btn btn-primary w-full" style={{ justifyContent: 'center' }}
                     onClick={save} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Measurements'}
+                    {saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Measurements'}
                 </button>
             </div>
         </div>
@@ -134,6 +144,7 @@ function Trend({ current, prev }: { current?: number | null; prev?: number | nul
 export default function MeasurementsView() {
     const [tab, setTab] = useState<Tab>('latest');
     const [showForm, setShowForm] = useState(false);
+    const [editingMeasurement, setEditingMeasurement] = useState<HealthMeasurement | undefined>();
     const [measurements, setMeasurements] = useState<HealthMeasurement[]>([]);
     const [latestStatus, setLatestStatus] = useState<any>(null);
     const [trends, setTrends] = useState<HealthMeasurement[]>([]);
@@ -286,10 +297,16 @@ export default function MeasurementsView() {
                                                 {m.restingHeartRate && <span>{m.restingHeartRate} bpm</span>}
                                             </div>
                                         </div>
-                                        <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
-                                            onClick={async () => { if (confirm('Delete?')) { await api.measurements.delete(m.id); load(); } }}>
-                                            <Trash2 size={14} color="var(--color-text-3)" />
-                                        </button>
+                                        <div style={{ display: 'flex', gap: 2 }}>
+                                            <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
+                                                onClick={() => { setEditingMeasurement(m); setShowForm(true); }}>
+                                                <Pencil size={14} color="var(--color-text-3)" />
+                                            </button>
+                                            <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
+                                                onClick={async () => { if (confirm('Delete?')) { await api.measurements.delete(m.id); load(); } }}>
+                                                <Trash2 size={14} color="var(--color-text-3)" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -374,7 +391,7 @@ export default function MeasurementsView() {
                 </div>
             )}
 
-            {showForm && <MeasurementForm onClose={() => setShowForm(false)} onSaved={load} />}
+            {showForm && <MeasurementForm onClose={() => { setShowForm(false); setEditingMeasurement(undefined); }} onSaved={load} editing={editingMeasurement} />}
         </div>
     );
 }

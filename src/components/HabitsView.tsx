@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Flame, CheckCircle2, Trophy, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, X, Flame, CheckCircle2, Trophy, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { api } from '../services/api';
 import { Habit, HabitWithCompletion, HabitStats } from '../types';
@@ -119,14 +119,17 @@ function HabitStatsModal({ habit, onClose }: { habit: Habit; onClose: () => void
     );
 }
 
-function NewHabitForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NewHabitForm({ onClose, onSaved, editing }: { onClose: () => void; onSaved: () => void; editing?: Habit }) {
     const [form, setForm] = useState({
-        name: '', description: '',
-        frequency: 'daily' as 'daily' | 'selected_days' | 'weekly',
-        selectedDays: [] as number[],
-        targetValue: '', unit: '',
-        startDate: format(new Date(), 'yyyy-MM-dd'),
-        reminderTime: '', motivationMsg: ''
+        name: editing?.name ?? '',
+        description: editing?.description ?? '',
+        frequency: (editing?.frequency ?? 'daily') as 'daily' | 'selected_days' | 'weekly',
+        selectedDays: editing?.selectedDays ?? [] as number[],
+        targetValue: editing?.targetValue?.toString() ?? '',
+        unit: editing?.unit ?? '',
+        startDate: editing?.startDate ?? format(new Date(), 'yyyy-MM-dd'),
+        reminderTime: editing?.reminderTime ?? '',
+        motivationMsg: editing?.motivationMsg ?? ''
     });
     const [saving, setSaving] = useState(false);
     const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -135,14 +138,19 @@ function NewHabitForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         if (!form.name.trim()) return;
         setSaving(true);
         try {
-            await api.habits.create({
+            const payload = {
                 ...form,
                 targetValue: form.targetValue ? parseFloat(form.targetValue) : null,
                 unit: form.unit || null,
                 reminderTime: form.reminderTime || null,
                 motivationMsg: form.motivationMsg || null,
                 active: true
-            });
+            };
+            if (editing) {
+                await api.habits.update(editing.id, payload);
+            } else {
+                await api.habits.create(payload);
+            }
             onSaved(); onClose();
         } finally { setSaving(false); }
     };
@@ -152,7 +160,7 @@ function NewHabitForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             <div className="modal-sheet">
                 <div className="modal-handle" />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <h3>New Habit</h3>
+                    <h3>{editing ? 'Edit Habit' : 'New Habit'}</h3>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>
 
@@ -223,7 +231,7 @@ function NewHabitForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
                     <button className="btn btn-primary w-full" style={{ justifyContent: 'center', marginTop: 4 }}
                         onClick={save} disabled={saving || !form.name.trim()}>
-                        {saving ? 'Saving...' : 'Create Habit'}
+                        {saving ? 'Saving...' : editing ? 'Save Changes' : 'Create Habit'}
                     </button>
                 </div>
             </div>
@@ -235,6 +243,7 @@ export default function HabitsView() {
     const [habits, setHabits] = useState<HabitWithCompletion[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+    const [editingHabit, setEditingHabit] = useState<Habit | undefined>();
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -324,11 +333,15 @@ export default function HabitsView() {
                                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{h.description}</div>
                                 )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 {done && <Flame size={16} color="var(--color-primary)" />}
                                 <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
                                     onClick={() => setSelectedHabit(h)}>
                                     <Trophy size={14} color="var(--color-text-3)" />
+                                </button>
+                                <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
+                                    onClick={() => { setEditingHabit(h); setShowForm(true); }}>
+                                    <Pencil size={14} color="var(--color-text-3)" />
                                 </button>
                                 <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
                                     onClick={async () => {
@@ -345,7 +358,7 @@ export default function HabitsView() {
                 })
             )}
 
-            {showForm && <NewHabitForm onClose={() => setShowForm(false)} onSaved={load} />}
+            {showForm && <NewHabitForm onClose={() => { setShowForm(false); setEditingHabit(undefined); }} onSaved={load} editing={editingHabit} />}
             {selectedHabit && <HabitStatsModal habit={selectedHabit} onClose={() => setSelectedHabit(null)} />}
         </div>
     );

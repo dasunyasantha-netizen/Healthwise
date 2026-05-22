@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, UtensilsCrossed, Droplets, Trash2, Timer, Play, Square, RotateCcw } from 'lucide-react';
+import { Plus, X, UtensilsCrossed, Droplets, Trash2, Timer, Play, Square, Pencil } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { api } from '../services/api';
 import { MealLog, FastingSession } from '../types';
@@ -7,11 +7,17 @@ import { MealLog, FastingSession } from '../types';
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack', 'other'] as const;
 const FASTING_PRESETS = [12, 14, 16, 18, 20, 24];
 
-function MealForm({ onClose, onSaved, date }: { onClose: () => void; onSaved: () => void; date: string }) {
+function MealForm({ onClose, onSaved, date, editing }: { onClose: () => void; onSaved: () => void; date: string; editing?: MealLog }) {
     const [form, setForm] = useState({
-        mealType: 'lunch' as typeof MEAL_TYPES[number],
-        foodItems: '', time: format(new Date(), 'HH:mm'),
-        calories: '', protein: '', carbs: '', fat: '', waterMl: '', notes: ''
+        mealType: (editing?.mealType ?? 'lunch') as typeof MEAL_TYPES[number],
+        foodItems: editing?.foodItems ?? '',
+        time: editing?.time ?? format(new Date(), 'HH:mm'),
+        calories: editing?.calories?.toString() ?? '',
+        protein: editing?.protein?.toString() ?? '',
+        carbs: editing?.carbs?.toString() ?? '',
+        fat: editing?.fat?.toString() ?? '',
+        waterMl: editing?.waterMl?.toString() ?? '',
+        notes: editing?.notes ?? ''
     });
     const [saving, setSaving] = useState(false);
 
@@ -19,7 +25,7 @@ function MealForm({ onClose, onSaved, date }: { onClose: () => void; onSaved: ()
         if (!form.foodItems.trim()) return;
         setSaving(true);
         try {
-            await api.meals.create({
+            const payload = {
                 date,
                 time: form.time,
                 mealType: form.mealType,
@@ -30,7 +36,12 @@ function MealForm({ onClose, onSaved, date }: { onClose: () => void; onSaved: ()
                 fat: form.fat ? parseFloat(form.fat) : null,
                 waterMl: form.waterMl ? parseFloat(form.waterMl) : null,
                 notes: form.notes || null
-            });
+            };
+            if (editing) {
+                await api.meals.update(editing.id, payload);
+            } else {
+                await api.meals.create(payload);
+            }
             onSaved(); onClose();
         } finally { setSaving(false); }
     };
@@ -40,7 +51,7 @@ function MealForm({ onClose, onSaved, date }: { onClose: () => void; onSaved: ()
             <div className="modal-sheet">
                 <div className="modal-handle" />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <h3>Log Meal</h3>
+                    <h3>{editing ? 'Edit Meal' : 'Log Meal'}</h3>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>
 
@@ -100,7 +111,7 @@ function MealForm({ onClose, onSaved, date }: { onClose: () => void; onSaved: ()
 
                     <button className="btn btn-primary w-full" style={{ justifyContent: 'center', marginTop: 4 }}
                         onClick={save} disabled={saving || !form.foodItems.trim()}>
-                        {saving ? 'Saving...' : 'Log Meal'}
+                        {saving ? 'Saving...' : editing ? 'Save Changes' : 'Log Meal'}
                     </button>
                 </div>
             </div>
@@ -235,6 +246,7 @@ export default function MealsView() {
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [meals, setMeals] = useState<MealLog[]>([]);
     const [showForm, setShowForm] = useState(false);
+    const [editingMeal, setEditingMeal] = useState<MealLog | undefined>();
 
     const load = async () => {
         try {
@@ -330,10 +342,16 @@ export default function MealsView() {
                                             {m.waterMl && <span style={{ fontSize: '0.75rem', color: '#3b82f6' }}><Droplets size={10} style={{ display: 'inline' }} /> {m.waterMl}ml</span>}
                                         </div>
                                     </div>
-                                    <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
-                                        onClick={async () => { await api.meals.delete(m.id); load(); }}>
-                                        <Trash2 size={15} color="var(--color-text-3)" />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 2 }}>
+                                        <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
+                                            onClick={() => { setEditingMeal(m); setShowForm(true); }}>
+                                            <Pencil size={14} color="var(--color-text-3)" />
+                                        </button>
+                                        <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
+                                            onClick={async () => { await api.meals.delete(m.id); load(); }}>
+                                            <Trash2 size={15} color="var(--color-text-3)" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -343,7 +361,7 @@ export default function MealsView() {
 
             {tab === 'fasting' && <FastingView />}
 
-            {showForm && <MealForm date={date} onClose={() => setShowForm(false)} onSaved={load} />}
+            {showForm && <MealForm date={date} onClose={() => { setShowForm(false); setEditingMeal(undefined); }} onSaved={load} editing={editingMeal} />}
         </div>
     );
 }
