@@ -47,17 +47,21 @@ export const createMeasurement = async (req: AuthRequest, res: Response) => {
 
     // Auto-calculate BMI if weight and height are available
     if (data.weight && !data.bmi) {
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        const height = data.height || user?.height;
+        const settings = await prisma.settings.findUnique({ where: { userId } });
+        const height = data.height || settings?.height;
         if (height) {
             const heightM = height / 100;
             data.bmi = parseFloat((data.weight / (heightM * heightM)).toFixed(1));
         }
     }
 
-    // Store height on user profile if provided
+    // Store height on settings if provided
     if (data.height) {
-        await prisma.user.update({ where: { id: userId }, data: { height: data.height } });
+        await prisma.settings.upsert({
+            where: { userId },
+            update: { height: data.height },
+            create: { userId, height: data.height },
+        });
     }
 
     const measurement = await prisma.healthMeasurement.create({

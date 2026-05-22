@@ -8,39 +8,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  handle    String?
-  phone     String?
-  avatarUrl String?
-  height    Float?   // cm — used for BMI calculation
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  settings         Settings?
-  exercises        Exercise[]         @relation("UserCreatedExercises")
-  workoutPlans     WorkoutPlan[]
-  workoutSessions  WorkoutSession[]
-  mealLogs         MealLog[]
-  fastingSessions  FastingSession[]
-  habits           Habit[]
-  habitCompletions HabitCompletion[]
-  measurements     HealthMeasurement[]
+// SysWise token cache — no local User table
+model Session {
+  userId       Int      @id
+  syswiseToken String
+  updatedAt    DateTime @updatedAt
 }
 
 model Settings {
-  id                  String  @id @default(uuid())
-  userId              String  @unique
-  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notifications       Boolean @default(true)
-  measurementUnit     String  @default("metric") // metric | imperial
-  weightUnit          String  @default("kg")
-  measurementReminderDays Int @default(14)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  userId                  Int      @unique
+  notifications           Boolean  @default(true)
+  measurementUnit         String   @default("metric")
+  weightUnit              String   @default("kg")
+  measurementReminderDays Int      @default(14)
+  height                  Float?   // cm — used for BMI calculation
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 // ─── EXERCISE LIBRARY ────────────────────────────────────────────────────────
@@ -48,19 +32,18 @@ model Settings {
 model Exercise {
   id               String   @id @default(uuid())
   name             String
-  category         String   // Chest, Back, Shoulders, etc.
+  category         String
   primaryMuscle    String
   secondaryMuscles String[]
   bodyPartFocus    String
-  equipment        String   // barbell, dumbbell, cable, bodyweight, machine, etc.
-  trackingType     String   // reps_weight | time | distance | reps_only
+  equipment        String
+  trackingType     String
   demoVideoUrl     String?
   sourceUrl        String?
   instructions     String?
   safetyNotes      String?
   isSystem         Boolean  @default(false)
-  createdByUserId  String?
-  createdBy        User?    @relation("UserCreatedExercises", fields: [createdByUserId], references: [id])
+  createdByUserId  Int?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -72,10 +55,9 @@ model Exercise {
 
 model WorkoutPlan {
   id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     Int
   name       String
-  date       String?  // YYYY-MM-DD — null if template
+  date       String?
   isTemplate Boolean  @default(false)
   notes      String?
   createdAt  DateTime @default(now())
@@ -103,18 +85,17 @@ model WorkoutPlanExercise {
 // ─── WORKOUT SESSIONS ─────────────────────────────────────────────────────────
 
 model WorkoutSession {
-  id            String      @id @default(uuid())
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String       @id @default(uuid())
+  userId        Int
   workoutPlanId String?
   workoutPlan   WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
-  date          String      // YYYY-MM-DD
-  startedAt     DateTime    @default(now())
+  date          String
+  startedAt     DateTime     @default(now())
   endedAt       DateTime?
-  status        String      @default("planned") // planned | in_progress | completed | skipped
+  status        String       @default("planned")
   notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   exerciseLogs WorkoutExerciseLog[]
 }
@@ -152,16 +133,15 @@ model WorkoutSetLog {
 
 model MealLog {
   id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date      String   // YYYY-MM-DD
-  time      String?  // HH:MM
-  mealType  String   // breakfast | lunch | dinner | snack | other
-  foodItems String   // free-text description
+  userId    Int
+  date      String
+  time      String?
+  mealType  String
+  foodItems String
   calories  Float?
-  protein   Float?   // grams
-  carbs     Float?   // grams
-  fat       Float?   // grams
+  protein   Float?
+  carbs     Float?
+  fat       Float?
   waterMl   Float?
   notes     String?
   photoUrl  String?
@@ -173,12 +153,11 @@ model MealLog {
 
 model FastingSession {
   id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
   startTime   DateTime
   endTime     DateTime?
   targetHours Float     @default(16)
-  status      String    @default("active") // active | completed | cancelled
+  status      String    @default("active")
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -187,21 +166,20 @@ model FastingSession {
 // ─── HABITS / STREAKS ─────────────────────────────────────────────────────────
 
 model Habit {
-  id               String   @id @default(uuid())
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name             String
-  description      String?
-  frequency        String   @default("daily") // daily | selected_days | weekly
-  selectedDays     Int[]    // 0=Sun … 6=Sat — used when frequency=selected_days
-  targetValue      Float?
-  unit             String?
-  startDate        String   // YYYY-MM-DD
-  reminderTime     String?  // HH:MM
-  motivationMsg    String?
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        Int
+  name          String
+  description   String?
+  frequency     String   @default("daily")
+  selectedDays  Int[]
+  targetValue   Float?
+  unit          String?
+  startDate     String
+  reminderTime  String?
+  motivationMsg String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   completions HabitCompletion[]
 }
@@ -210,9 +188,8 @@ model HabitCompletion {
   id        String   @id @default(uuid())
   habitId   String
   habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date      String   // YYYY-MM-DD
+  userId    Int
+  date      String
   completed Boolean  @default(false)
   value     Float?
   notes     String?
@@ -226,26 +203,25 @@ model HabitCompletion {
 
 model HealthMeasurement {
   id                String   @id @default(uuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date              String   // YYYY-MM-DD
-  weight            Float?   // kg
-  waist             Float?   // cm
-  chest             Float?   // cm
-  hip               Float?   // cm
-  neck              Float?   // cm
-  leftArm           Float?   // cm
-  rightArm          Float?   // cm
-  leftThigh         Float?   // cm
-  rightThigh        Float?   // cm
-  bodyFatPercentage Float?   // %
-  bmi               Float?   // calculated or overridden
-  restingHeartRate  Int?     // bpm
-  systolicBp        Int?     // mmHg
-  diastolicBp       Int?     // mmHg
-  spo2              Float?   // %
-  bodyTemperature   Float?   // °C
-  fastingGlucose    Float?   // mmol/L
+  userId            Int
+  date              String
+  weight            Float?
+  waist             Float?
+  chest             Float?
+  hip               Float?
+  neck              Float?
+  leftArm           Float?
+  rightArm          Float?
+  leftThigh         Float?
+  rightThigh        Float?
+  bodyFatPercentage Float?
+  bmi               Float?
+  restingHeartRate  Int?
+  systolicBp        Int?
+  diastolicBp       Int?
+  spo2              Float?
+  bodyTemperature   Float?
+  fastingGlucose    Float?
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

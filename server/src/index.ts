@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import exerciseRoutes from './routes/exerciseRoutes';
 import workoutRoutes from './routes/workoutRoutes';
 import mealRoutes from './routes/mealRoutes';
@@ -21,6 +22,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/meals', mealRoutes);

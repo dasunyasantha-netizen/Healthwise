@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
 
 export const ssoLogin = async (req: Request, res: Response) => {
-    const { token, syswise_token, phone, email, name } = req.body;
+    const { token, syswise_token, syswiseUserId, phone, email, name } = req.body;
     const ssoToken = token || syswise_token;
 
     try {
@@ -13,51 +12,32 @@ export const ssoLogin = async (req: Request, res: Response) => {
             return;
         }
 
-        const identifier = phone || email;
-        if (!identifier) {
-            res.status(400).json({ error: 'No identifier provided' });
+        let userId = syswiseUserId ? parseInt(syswiseUserId, 10) : null;
+        if (!userId) {
+            const payload = JSON.parse(Buffer.from(ssoToken.split('.')[1], 'base64').toString());
+            userId = payload.user_id || payload.id || null;
+        }
+
+        if (!userId || isNaN(userId)) {
+            res.status(400).json({ error: 'Could not determine SysWise user ID' });
             return;
         }
 
-        let user = await prisma.user.findFirst({
-            where: {
-                OR: [
-                    { phone: phone || undefined },
-                    { email: email || undefined }
-                ]
-            }
+        await prisma.session.upsert({
+            where: { userId },
+            update: { syswiseToken: ssoToken },
+            create: { userId, syswiseToken: ssoToken },
         });
 
-        if (!user) {
-            const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
-            user = await prisma.user.create({
-                data: {
-                    email: email || `${phone}@syswise.local`,
-                    phone: phone || null,
-                    name: name || 'SysWise User',
-                    handle: (phone || email?.split('@')[0] || 'user').replace(/[^a-zA-Z0-9]/g, ''),
-                    password: randomPassword,
-                },
-            });
-        }
-
         const hwToken = jwt.sign(
-            { userId: user.id },
+            { userId, syswiseToken: ssoToken },
             process.env.JWT_SECRET as string,
             { expiresIn: '24h' }
         );
 
         res.json({
             token: hwToken,
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                handle: user.handle,
-                avatarUrl: user.avatarUrl,
-                height: user.height,
-            }
+            user: { id: userId, name: name || 'SysWise User', email: email || '', phone: phone || '' }
         });
     } catch (error) {
         console.error('SSO login error:', error);
