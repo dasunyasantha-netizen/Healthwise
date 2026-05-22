@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS "Session" (
     "updatedAt"    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 2. Add integer columns alongside existing String userId columns
+-- 2. Add new columns
+ALTER TABLE "Settings"          ADD COLUMN IF NOT EXISTS "height"    DOUBLE PRECISION;
 ALTER TABLE "Settings"          ADD COLUMN IF NOT EXISTS "userIdInt" INTEGER;
 ALTER TABLE "WorkoutPlan"       ADD COLUMN IF NOT EXISTS "userIdInt" INTEGER;
 ALTER TABLE "WorkoutSession"    ADD COLUMN IF NOT EXISTS "userIdInt" INTEGER;
@@ -119,10 +120,7 @@ ALTER TABLE "Exercise"          RENAME COLUMN "createdByUserIdInt" TO "createdBy
 -- 8. Restore unique constraint on Settings.userId
 ALTER TABLE "Settings" ADD CONSTRAINT "Settings_userId_key" UNIQUE ("userId");
 
--- 9. Add height column to Settings if not already present (in case schema not yet applied)
-ALTER TABLE "Settings" ADD COLUMN IF NOT EXISTS "height" DOUBLE PRECISION;
-
--- 10. Drop User table
+-- 9. Drop User table
 DROP TABLE IF EXISTS "User";
 
 COMMIT;
