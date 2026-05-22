@@ -1,10 +1,16 @@
-import { Activity, LogOut } from 'lucide-react';
+import { Activity, LogOut, Home } from 'lucide-react';
 import { User } from '../types';
 
 interface Props {
     user: User;
     onLogout: () => void;
 }
+
+const getSyswiseUrl = () => {
+    if (typeof window === 'undefined') return 'https://syswise.lk';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocal ? 'http://localhost:3100' : 'https://syswise.lk';
+};
 
 export default function Header({ user, onLogout }: Props) {
     return (
@@ -25,9 +31,14 @@ export default function Header({ user, onLogout }: Props) {
                 </div>
             </div>
 
-            <button className="btn btn-ghost btn-icon" onClick={onLogout} title="Sign out">
-                <LogOut size={18} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <a href={getSyswiseUrl()} className="btn btn-ghost btn-icon" title="Back to SysWise">
+                    <Home size={18} />
+                </a>
+                <button className="btn btn-ghost btn-icon" onClick={onLogout} title="Sign out">
+                    <LogOut size={18} />
+                </button>
+            </div>
         </header>
     );
 }
