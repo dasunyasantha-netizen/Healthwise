@@ -239,6 +239,9 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [step, setStep] = useState<'info' | 'exercises'>('info');
+    const [showNewEx, setShowNewEx] = useState(false);
+    const [newEx, setNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight' });
+    const [creatingEx, setCreatingEx] = useState(false);
 
     useEffect(() => {
         api.exercises.list().then(exList => {
@@ -274,6 +277,28 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     };
 
     const remove = (id: string) => setSelected(s => s.filter(x => x.exercise.id !== id));
+
+    const createAndAdd = async () => {
+        if (!newEx.name.trim()) return;
+        setCreatingEx(true);
+        try {
+            const created: Exercise = await api.exercises.create({
+                name: newEx.name.trim(),
+                category: newEx.category,
+                trackingType: newEx.trackingType,
+                equipment: newEx.equipment,
+                primaryMuscle: 'General',
+                secondaryMuscles: [],
+                bodyPartFocus: 'Full Body',
+                isSystem: false,
+            });
+            setExercises(prev => [...prev, created]);
+            addExercise(created);
+            setShowNewEx(false);
+            setNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight' });
+            setSearch('');
+        } catch {} finally { setCreatingEx(false); }
+    };
 
     const save = async () => {
         if (!name.trim()) return;
@@ -368,13 +393,62 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         )}
 
-                        <div style={{ position: 'relative', marginBottom: 10 }}>
-                            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
-                            <input className="input" placeholder="Search exercises..." value={search}
-                                onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
+                                <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
+                                <input className="input" placeholder="Search exercises..." value={search}
+                                    onChange={e => { setSearch(e.target.value); setShowNewEx(false); }} style={{ paddingLeft: 36 }} />
+                            </div>
+                            <button className="btn btn-secondary btn-sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                                onClick={() => { setShowNewEx(v => !v); setNewEx(n => ({ ...n, name: search })); }}>
+                                <Plus size={14} /> New
+                            </button>
                         </div>
 
-                        <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {showNewEx && (
+                            <div style={{
+                                background: 'var(--color-primary-bg)', borderRadius: 'var(--radius-xl)',
+                                padding: '12px 14px', marginBottom: 10,
+                                border: '1.5px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: 10
+                            }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>Create new exercise</div>
+                                <input className="input" placeholder="Exercise name" value={newEx.name}
+                                    onChange={e => setNewEx(n => ({ ...n, name: e.target.value }))}
+                                    onKeyDown={e => e.key === 'Enter' && createAndAdd()} autoFocus />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                    <select className="input" value={newEx.category} onChange={e => setNewEx(n => ({ ...n, category: e.target.value }))}>
+                                        {['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                    <select className="input" value={newEx.trackingType} onChange={e => setNewEx(n => ({ ...n, trackingType: e.target.value as Exercise['trackingType'] }))}>
+                                        <option value="reps_weight">Reps + Weight</option>
+                                        <option value="reps_only">Reps only</option>
+                                        <option value="time">Time</option>
+                                        <option value="distance">Distance</option>
+                                    </select>
+                                    <select className="input" value={newEx.equipment} onChange={e => setNewEx(n => ({ ...n, equipment: e.target.value }))} style={{ gridColumn: '1 / -1' }}>
+                                        {['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => <option key={eq}>{eq}</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowNewEx(false)}>Cancel</button>
+                                    <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                        onClick={createAndAdd} disabled={creatingEx || !newEx.name.trim()}>
+                                        {creatingEx ? 'Adding...' : 'Add to plan'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {filtered.length === 0 && !showNewEx && (
+                                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
+                                    No exercises found.{' '}
+                                    <button className="btn-ghost" style={{ color: 'var(--color-primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                                        onClick={() => { setShowNewEx(true); setNewEx(n => ({ ...n, name: search })); }}>
+                                        Create "{search}"
+                                    </button>
+                                </div>
+                            )}
                             {filtered.map(ex => {
                                 const isAdded = selected.some(s => s.exercise.id === ex.id);
                                 return (
