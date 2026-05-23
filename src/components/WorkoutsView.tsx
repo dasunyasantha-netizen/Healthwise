@@ -1,10 +1,82 @@
-import { useState, useEffect } from 'react';
-import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
 
 type Tab = 'today' | 'plans' | 'library';
+
+function CustomSelect({ label, value, options, onChange }: {
+    label: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (v: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    const selectedLabel = options.find(o => o.value === value)?.label ?? value;
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div className="form-group" style={{ margin: 0 }} ref={ref}>
+            <label className="label">{label}</label>
+            <div style={{ position: 'relative' }}>
+                <button
+                    type="button"
+                    onClick={() => setOpen(v => !v)}
+                    style={{
+                        width: '100%', padding: '11px 14px',
+                        border: `1.5px solid ${open ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        borderRadius: 'var(--radius-lg)', fontFamily: 'var(--font)',
+                        fontSize: '0.9375rem', color: 'var(--color-text)',
+                        background: 'var(--color-surface)', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        textAlign: 'left', transition: 'border-color .15s',
+                    }}
+                >
+                    <span>{selectedLabel}</span>
+                    <ChevronDown size={16} color="var(--color-text-3)"
+                        style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s', flexShrink: 0 }} />
+                </button>
+                {open && (
+                    <div style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                        background: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
+                        borderRadius: 'var(--radius-lg)', zIndex: 999,
+                        boxShadow: '0 8px 24px rgba(0,0,0,.12)', overflow: 'hidden',
+                    }}>
+                        {options.map(o => (
+                            <button
+                                key={o.value}
+                                type="button"
+                                onClick={() => { onChange(o.value); setOpen(false); }}
+                                style={{
+                                    width: '100%', padding: '10px 14px', border: 'none',
+                                    background: o.value === value ? 'var(--color-primary-bg)' : 'transparent',
+                                    color: o.value === value ? 'var(--color-primary)' : 'var(--color-text)',
+                                    fontFamily: 'var(--font)', fontSize: '0.9375rem',
+                                    fontWeight: o.value === value ? 700 : 400,
+                                    cursor: 'pointer', textAlign: 'left',
+                                    borderBottom: '1px solid var(--color-border-light)',
+                                    display: 'block',
+                                }}
+                            >
+                                {o.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 // ─── EXERCISE TIMER ─────────────────────────────────────────────────────────
 
@@ -422,33 +494,23 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                                     onChange={e => setNewEx(n => ({ ...n, name: e.target.value }))}
                                     onKeyDown={e => e.key === 'Enter' && createAndAdd()} autoFocus />
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="label">Category</label>
-                                        <select className="input" value={newEx.category} onChange={e => setNewEx(n => ({ ...n, category: e.target.value }))}>
-                                            {['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => <option key={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="label">Muscle Target</label>
-                                        <select className="input" value={newEx.primaryMuscle} onChange={e => setNewEx(n => ({ ...n, primaryMuscle: e.target.value }))}>
-                                            {['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves','Full Body'].map(m => <option key={m}>{m}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="label">Tracking</label>
-                                        <select className="input" value={newEx.trackingType} onChange={e => setNewEx(n => ({ ...n, trackingType: e.target.value as Exercise['trackingType'] }))}>
-                                            <option value="reps_weight">Reps + Weight</option>
-                                            <option value="reps_only">Reps only</option>
-                                            <option value="time">Time</option>
-                                            <option value="distance">Distance</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group" style={{ margin: 0 }}>
-                                        <label className="label">Equipment</label>
-                                        <select className="input" value={newEx.equipment} onChange={e => setNewEx(n => ({ ...n, equipment: e.target.value }))}>
-                                            {['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => <option key={eq}>{eq}</option>)}
-                                        </select>
-                                    </div>
+                                    <CustomSelect label="Category" value={newEx.category}
+                                        options={['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => ({ value: c, label: c }))}
+                                        onChange={v => setNewEx(n => ({ ...n, category: v }))} />
+                                    <CustomSelect label="Muscle Target" value={newEx.primaryMuscle}
+                                        options={['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves','Full Body'].map(m => ({ value: m, label: m }))}
+                                        onChange={v => setNewEx(n => ({ ...n, primaryMuscle: v }))} />
+                                    <CustomSelect label="Tracking" value={newEx.trackingType}
+                                        options={[
+                                            { value: 'reps_weight', label: 'Reps + Weight' },
+                                            { value: 'reps_only',   label: 'Reps only' },
+                                            { value: 'time',        label: 'Time' },
+                                            { value: 'distance',    label: 'Distance' },
+                                        ]}
+                                        onChange={v => setNewEx(n => ({ ...n, trackingType: v as Exercise['trackingType'] }))} />
+                                    <CustomSelect label="Equipment" value={newEx.equipment}
+                                        options={['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => ({ value: eq, label: eq }))}
+                                        onChange={v => setNewEx(n => ({ ...n, equipment: v }))} />
                                 </div>
 
                                 <div style={{ display: 'flex', gap: 8 }}>
