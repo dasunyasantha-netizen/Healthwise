@@ -321,6 +321,7 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
         primaryMuscle: 'Chest',
     });
     const [creatingEx, setCreatingEx] = useState(false);
+    const [muscleFilter, setMuscleFilter] = useState('');
 
     useEffect(() => {
         api.exercises.list().then(exList => {
@@ -339,9 +340,18 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     }, []);
 
     const filtered = exercises.filter(e =>
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.category.toLowerCase().includes(search.toLowerCase())
+        (e.name.toLowerCase().includes(search.toLowerCase()) ||
+         e.category.toLowerCase().includes(search.toLowerCase()) ||
+         (e.primaryMuscle ?? '').toLowerCase().includes(search.toLowerCase())) &&
+        (!muscleFilter || e.primaryMuscle === muscleFilter)
     );
+    const muscles = [...new Set(exercises.map(e => e.primaryMuscle).filter(Boolean))].sort();
+    const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
+        const key = ex.primaryMuscle || 'Other';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(ex);
+        return acc;
+    }, {});
 
     const addExercise = (ex: Exercise) => {
         if (selected.find(s => s.exercise.id === ex.id)) return;
@@ -523,31 +533,63 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {filtered.length === 0 && !showNewEx && (
-                                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
-                                    No exercises found.{' '}
-                                    <button className="btn-ghost" style={{ color: 'var(--color-primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
-                                        onClick={() => { setShowNewEx(true); setNewEx(n => ({ ...n, name: search })); }}>
-                                        Create "{search}"
-                                    </button>
-                                </div>
-                            )}
-                            {filtered.map(ex => {
-                                const isAdded = selected.some(s => s.exercise.id === ex.id);
-                                return (
-                                    <div key={ex.id} className="exercise-card" onClick={() => addExercise(ex)}
-                                        style={{ opacity: isAdded ? 0.5 : 1 }}>
-                                        <div className="exercise-icon"><Dumbbell size={18} /></div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{ex.name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{ex.category} · {ex.equipment}</div>
-                                        </div>
-                                        {isAdded ? <CheckCircle2 size={18} color="var(--color-primary)" /> : <Plus size={16} color="var(--color-text-3)" />}
-                                    </div>
-                                );
-                            })}
+                        {/* Muscle filter pills */}
+                        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 10, scrollbarWidth: 'none' }}>
+                            <button onClick={() => setMuscleFilter('')} style={{
+                                padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
+                                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                                background: !muscleFilter ? 'var(--color-primary)' : 'var(--color-surface)',
+                                color: !muscleFilter ? '#fff' : 'var(--color-text-2)',
+                                boxShadow: !muscleFilter ? 'none' : '0 0 0 1.5px var(--color-border-light)',
+                            }}>All</button>
+                            {muscles.map(m => (
+                                <button key={m} onClick={() => setMuscleFilter(muscleFilter === m ? '' : m)} style={{
+                                    padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
+                                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                                    background: muscleFilter === m ? 'var(--color-primary)' : 'var(--color-surface)',
+                                    color: muscleFilter === m ? '#fff' : 'var(--color-text-2)',
+                                    boxShadow: muscleFilter === m ? 'none' : '0 0 0 1.5px var(--color-border-light)',
+                                }}>{m}</button>
+                            ))}
                         </div>
+
+                        {/* Grouped exercise list */}
+                        {filtered.length === 0 && !showNewEx ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
+                                No exercises found.{' '}
+                                <button style={{ color: 'var(--color-primary)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                                    onClick={() => { setShowNewEx(true); setNewEx(n => ({ ...n, name: search })); }}>
+                                    Create "{search}"
+                                </button>
+                            </div>
+                        ) : (
+                            Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([muscle, exList]) => (
+                                <div key={muscle} style={{ marginBottom: 12 }}>
+                                    <div style={{
+                                        fontSize: '0.6875rem', fontWeight: 800, color: 'var(--color-text-3)',
+                                        textTransform: 'uppercase', letterSpacing: '.07em',
+                                        padding: '4px 2px', marginBottom: 4,
+                                        borderBottom: '1px solid var(--color-border-light)',
+                                    }}>{muscle}</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        {exList.map(ex => {
+                                            const isAdded = selected.some(s => s.exercise.id === ex.id);
+                                            return (
+                                                <div key={ex.id} className="exercise-card" onClick={() => addExercise(ex)}
+                                                    style={{ opacity: isAdded ? 0.5 : 1 }}>
+                                                    <div className="exercise-icon"><Dumbbell size={18} /></div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{ex.name}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{ex.category} · {ex.equipment}</div>
+                                                    </div>
+                                                    {isAdded ? <CheckCircle2 size={18} color="var(--color-primary)" /> : <Plus size={16} color="var(--color-text-3)" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))
+                        )}
 
                         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                             <button className="btn btn-ghost" onClick={() => setStep('info')}>← Back</button>
