@@ -617,6 +617,15 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             />
                         </div>
 
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setStep('info')}>← Back</button>
+                            <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                onClick={save} disabled={saving || selected.length === 0}>
+                                {saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Plan'}
+                            </button>
+                        </div>
+
                         {/* Grouped exercise list */}
                         {filtered.length === 0 && !showNewEx ? (
                             <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
@@ -662,13 +671,6 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             ))
                         )}
 
-                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                            <button className="btn btn-ghost" onClick={() => setStep('info')}>← Back</button>
-                            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
-                                onClick={save} disabled={saving || selected.length === 0}>
-                                {saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Plan'}
-                            </button>
-                        </div>
                     </div>
                 )}
             </div>
