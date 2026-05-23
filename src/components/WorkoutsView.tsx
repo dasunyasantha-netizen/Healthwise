@@ -1030,6 +1030,8 @@ export default function WorkoutsView() {
     const [showLibraryNewEx, setShowLibraryNewEx] = useState(false);
     const [libNewEx, setLibNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight', primaryMuscle: 'Chest' });
     const [libCreating, setLibCreating] = useState(false);
+    const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
+    const [finishing, setFinishing] = useState(false);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -1046,6 +1048,31 @@ export default function WorkoutsView() {
     };
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        if (!activeSession) return;
+        const loadPrev = async () => {
+            const map: Record<string, any[]> = {};
+            for (const log of activeSession.exerciseLogs) {
+                try {
+                    const history = await api.workouts.history(log.exerciseId);
+                    if (history.length > 0) map[log.exerciseId] = history[0].sets || [];
+                } catch {}
+            }
+            setPrevSetsMap(map);
+        };
+        loadPrev();
+    }, [activeSession?.id]);
+
+    const finishSession = async () => {
+        if (!activeSession) return;
+        setFinishing(true);
+        try {
+            await api.workouts.sessions.complete(activeSession.id);
+            await load();
+            setActiveSession(null);
+        } catch {} finally { setFinishing(false); }
+    };
 
     const createLibraryExercise = async () => {
         if (!libNewEx.name.trim()) return;
@@ -1070,7 +1097,6 @@ export default function WorkoutsView() {
     const startSession = async (plan: WorkoutPlan) => {
         try {
             const session = await api.workouts.sessions.create({ workoutPlanId: plan.id, date: today });
-            // Add exercise logs from plan
             const fullSession = { ...session, exerciseLogs: [] as any[], workoutPlan: { name: plan.name } };
             for (const pe of plan.exercises) {
                 const log = await api.workouts.sessions.addLog(session.id, {
@@ -1079,7 +1105,9 @@ export default function WorkoutsView() {
                 });
                 fullSession.exerciseLogs.push({ ...log, exercise: pe.exercise, sets: [] });
             }
+            setSessions(prev => [...prev, fullSession as WorkoutSession]);
             setActiveSession(fullSession as WorkoutSession);
+            setTab('today');
         } catch {}
     };
 
@@ -1108,31 +1136,81 @@ export default function WorkoutsView() {
 
             {tab === 'today' && (
                 <div>
-                    {sessions.filter(s => s.status === 'completed').length === 0 ? (
+                    {/* Active in-progress session */}
+                    {activeSession && (
+                        <div className="card" style={{ marginBottom: 16, border: '2px solid var(--color-primary)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                                <div className="exercise-icon" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                                    <Dumbbell size={18} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{activeSession.workoutPlan?.name || 'Workout'}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                        {activeSession.exerciseLogs.length} exercises · In progress
+                                    </div>
+                                </div>
+                                <button className="btn btn-primary btn-sm" onClick={finishSession} disabled={finishing}>
+                                    <CheckCircle2 size={14} /> {finishing ? 'Saving...' : 'Finish'}
+                                </button>
+                            </div>
+
+                            {activeSession.exerciseLogs.map((log) => (
+                                <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                                {getMajorGroup(log.exercise.primaryMuscle ?? '')} · {log.exercise.trackingType === 'time' ? 'Time-based' : log.exercise.trackingType === 'reps_only' ? 'Reps only' : 'Reps + Weight'}
+                                            </div>
+                                        </div>
+                                        <button className="btn btn-ghost btn-icon" style={{ padding: 4 }} onClick={async () => {
+                                            await api.workouts.exerciseLogs.update(log.id, { completed: !log.completed });
+                                            setActiveSession(s => s ? { ...s, exerciseLogs: s.exerciseLogs.map(l => l.id === log.id ? { ...l, completed: !l.completed } : l) } : s);
+                                        }}>
+                                            <CheckCircle2 size={20} color={log.completed ? 'var(--color-primary)' : 'var(--color-border)'} />
+                                        </button>
+                                    </div>
+                                    <SetLogger
+                                        logId={log.id}
+                                        sets={log.sets}
+                                        trackingType={log.exercise.trackingType}
+                                        exerciseName={log.exercise.name}
+                                        prevSets={prevSetsMap[log.exerciseId] || []}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Completed sessions */}
+                    {sessions.filter(s => s.status === 'completed').map(s => (
+                        <div key={s.id} className="card card-compact" style={{ marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div className="exercise-icon"><Dumbbell size={18} /></div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                        {s.exerciseLogs.length} exercises
+                                    </div>
+                                </div>
+                                <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
+                            </div>
+                        </div>
+                    ))}
+
+                    {!activeSession && sessions.filter(s => s.status === 'completed').length === 0 && (
                         <div className="empty-state">
                             <div className="empty-state-icon"><Dumbbell size={24} /></div>
-                            <h3 style={{ marginBottom: 8 }}>No workouts completed today</h3>
+                            <h3 style={{ marginBottom: 8 }}>No workouts today</h3>
                             <p style={{ fontSize: '0.875rem' }}>Start a plan from the Plans section.</p>
                         </div>
-                    ) : (
-                        sessions.filter(s => s.status === 'completed').map(s => (
-                            <div key={s.id} className="card card-compact" style={{ marginBottom: 10 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <div className="exercise-icon"><Dumbbell size={18} /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                            {s.exerciseLogs.length} exercises
-                                        </div>
-                                    </div>
-                                    <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
-                                </div>
-                            </div>
-                        ))
                     )}
-                    <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--color-surface-2)', fontSize: '0.8125rem', color: 'var(--color-text-3)', textAlign: 'center' }}>
-                        To start a workout, go to the <strong style={{ color: 'var(--color-text-2)' }}>Plans</strong> tab
-                    </div>
+
+                    {!activeSession && (
+                        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--color-surface-2)', fontSize: '0.8125rem', color: 'var(--color-text-3)', textAlign: 'center' }}>
+                            To start a workout, go to the <strong style={{ color: 'var(--color-text-2)' }}>Plans</strong> tab
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1259,7 +1337,6 @@ export default function WorkoutsView() {
 
             {showBuilder && <WorkoutPlanBuilder onClose={() => { setShowBuilder(false); setEditingPlan(undefined); }} onSaved={load} editing={editingPlan} />}
             {selectedExercise && <ExerciseDetailModal exercise={selectedExercise} onClose={() => setSelectedExercise(null)} />}
-            {activeSession && <SessionRunner session={activeSession} onClose={() => setActiveSession(null)} onComplete={load} />}
         </div>
     );
 }
