@@ -720,7 +720,6 @@ function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
                     <div>
                         <h2 style={{ fontSize: '1rem', marginBottom: 2 }}>Notes</h2>
                         <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-3)' }}>{exerciseName}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-3)', fontFamily: 'monospace' }}>{exerciseId || '(no id)'}</div>
                     </div>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>

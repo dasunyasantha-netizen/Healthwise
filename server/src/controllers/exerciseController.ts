@@ -98,27 +98,39 @@ export const deleteExercise = async (req: AuthRequest, res: Response) => {
 // ─── EXERCISE NOTES ──────────────────────────────────────────────────────────
 
 export const getExerciseNotes = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const notes = await prisma.exerciseNote.findMany({
-        where: { exerciseId: req.params.id, userId },
-        orderBy: { date: 'desc' }
-    });
-    res.json(notes);
+    try {
+        const userId = parseInt(String(req.user!.userId), 10);
+        const notes = await prisma.exerciseNote.findMany({
+            where: { exerciseId: req.params.id, userId },
+            orderBy: { date: 'desc' }
+        });
+        res.json(notes);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 };
 
 export const createExerciseNote = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const { note, date } = req.body;
-    const created = await prisma.exerciseNote.create({
-        data: { userId, exerciseId: req.params.id, note, date }
-    });
-    res.status(201).json(created);
+    try {
+        const userId = parseInt(String(req.user!.userId), 10);
+        const { note, date } = req.body;
+        const created = await prisma.exerciseNote.create({
+            data: { userId, exerciseId: req.params.id, note, date }
+        });
+        res.status(201).json(created);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 };
 
 export const deleteExerciseNote = async (req: AuthRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const existing = await prisma.exerciseNote.findFirst({ where: { id: req.params.noteId, userId } });
-    if (!existing) { res.status(404).json({ error: 'Note not found' }); return; }
-    await prisma.exerciseNote.delete({ where: { id: req.params.noteId } });
-    res.json({ success: true });
+    try {
+        const userId = parseInt(String(req.user!.userId), 10);
+        const existing = await prisma.exerciseNote.findFirst({ where: { id: req.params.noteId, userId } });
+        if (!existing) { res.status(404).json({ error: 'Note not found' }); return; }
+        await prisma.exerciseNote.delete({ where: { id: req.params.noteId } });
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 };
