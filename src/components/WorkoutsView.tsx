@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp } from 'lucide-react';
-import { format, startOfWeek, parseISO } from 'date-fns';
+import { format, startOfWeek, parseISO, addDays, isSameDay } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
@@ -1102,6 +1102,70 @@ function WorkoutAnalytics({ sessions, exercises }: { sessions: WorkoutSession[];
     );
 }
 
+// ─── DAY STRIP ───────────────────────────────────────────────────────────────
+
+function DayStrip({ selectedDate, onSelect }: { selectedDate: string; onSelect: (d: string) => void }) {
+    const todayDate = new Date();
+    const todayStr = format(todayDate, 'yyyy-MM-dd');
+    const dates = Array.from({ length: 61 }, (_, i) => addDays(todayDate, i - 30));
+    const stripRef = useRef<HTMLDivElement>(null);
+    const hasScrolled = useRef(false);
+
+    useLayoutEffect(() => {
+        if (!hasScrolled.current && stripRef.current) {
+            const el = stripRef.current.querySelector(`[data-date="${selectedDate}"]`) as HTMLElement | null;
+            if (el) { el.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' }); hasScrolled.current = true; }
+        }
+    }, [selectedDate]);
+
+    useEffect(() => {
+        if (hasScrolled.current) {
+            const el = stripRef.current?.querySelector(`[data-date="${selectedDate}"]`) as HTMLElement | null;
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [selectedDate]);
+
+    return (
+        <div ref={stripRef} style={{ display: 'flex', overflowX: 'auto', gap: 8, paddingBottom: 12, marginBottom: 8, scrollbarWidth: 'none' }}>
+            {dates.map(dateObj => {
+                const d = format(dateObj, 'yyyy-MM-dd');
+                const isSelected = d === selectedDate;
+                const isToday = d === todayStr;
+
+                let bg = 'var(--color-surface-2)';
+                let color = 'var(--color-text-3)';
+                let border = '1.5px solid transparent';
+                let shadow = 'none';
+                let transform = 'none';
+
+                if (isSelected && isToday) {
+                    bg = '#0073ea'; color = '#fff'; shadow = '0 4px 12px rgba(0,115,234,0.35)'; transform = 'scale(1.08)';
+                } else if (isSelected) {
+                    bg = 'var(--color-text)'; color = 'var(--color-surface)'; shadow = '0 4px 12px rgba(0,0,0,0.15)'; transform = 'scale(1.08)';
+                } else if (isToday) {
+                    bg = 'var(--color-surface)'; color = 'var(--color-text-2)'; border = '2px solid #0073ea';
+                }
+
+                return (
+                    <button key={d} data-date={d} onClick={() => onSelect(d)} style={{
+                        flexShrink: 0, width: 48, height: 64,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                        borderRadius: 14, border, background: bg, color, cursor: 'pointer',
+                        boxShadow: shadow, transform, transition: 'all .15s',
+                    }}>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', opacity: 0.75 }}>
+                            {format(dateObj, 'EEE')}
+                        </span>
+                        <span style={{ fontSize: '1.125rem', fontWeight: 800, lineHeight: 1 }}>
+                            {format(dateObj, 'd')}
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 // ─── MAIN WORKOUTS VIEW ───────────────────────────────────────────────────────
 
 export default function WorkoutsView() {
@@ -1234,36 +1298,7 @@ export default function WorkoutsView() {
             {tab === 'today' && (
                 <div>
                     {/* Day slider */}
-                    {(() => {
-                        const days = Array.from({ length: 7 }, (_, i) => {
-                            const d = new Date();
-                            d.setDate(d.getDate() - (6 - i));
-                            return format(d, 'yyyy-MM-dd');
-                        });
-                        return (
-                            <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 2 }}>
-                                {days.map(d => {
-                                    const isSelected = d === selectedDate;
-                                    const isToday = d === today;
-                                    const dayLabel = isToday ? 'Today' : format(new Date(d + 'T00:00:00'), 'EEE');
-                                    const dateNum = format(new Date(d + 'T00:00:00'), 'd');
-                                    return (
-                                        <button key={d} onClick={() => setSelectedDate(d)} style={{
-                                            flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                            gap: 2, padding: '8px 10px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                                            background: isSelected ? 'var(--color-primary)' : 'var(--color-surface-2)',
-                                            color: isSelected ? '#fff' : 'var(--color-text-2)',
-                                            transition: 'background .15s',
-                                            minWidth: 44,
-                                        }}>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', opacity: isSelected ? 1 : 0.7 }}>{dayLabel}</span>
-                                            <span style={{ fontSize: '1rem', fontWeight: 700, lineHeight: 1 }}>{dateNum}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })()}
+                    <DayStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
 
                     {/* Active in-progress session */}
                     {activeSession && (
