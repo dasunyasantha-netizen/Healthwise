@@ -1108,57 +1108,31 @@ export default function WorkoutsView() {
 
             {tab === 'today' && (
                 <div>
-                    {sessions.length === 0 ? (
+                    {sessions.filter(s => s.status === 'completed').length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-state-icon"><Dumbbell size={24} /></div>
-                            <h3 style={{ marginBottom: 8 }}>No sessions today</h3>
-                            <p style={{ fontSize: '0.875rem' }}>Start from a plan or create a new one.</p>
+                            <h3 style={{ marginBottom: 8 }}>No workouts completed today</h3>
+                            <p style={{ fontSize: '0.875rem' }}>Start a plan from the Plans section.</p>
                         </div>
                     ) : (
-                        sessions.map(s => (
+                        sessions.filter(s => s.status === 'completed').map(s => (
                             <div key={s.id} className="card card-compact" style={{ marginBottom: 10 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                     <div className="exercise-icon"><Dumbbell size={18} /></div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                            {s.exerciseLogs.length} exercises · {s.status}
+                                            {s.exerciseLogs.length} exercises
                                         </div>
                                     </div>
-                                    {s.status !== 'completed' && (
-                                        <button className="btn btn-primary btn-sm" onClick={() => setActiveSession(s)}>
-                                            <Play size={13} /> Resume
-                                        </button>
-                                    )}
-                                    {s.status === 'completed' && (
-                                        <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
-                                    )}
+                                    <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
                                 </div>
                             </div>
                         ))
                     )}
-
-                    {plans.length > 0 && (
-                        <div style={{ marginTop: 16 }}>
-                            <div className="section-title">Start from a Plan</div>
-                            {plans.filter(p => p.isTemplate || p.date === today).slice(0, 5).map(p => (
-                                <div key={p.id} className="card card-compact" style={{ marginBottom: 8 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600 }}>{p.name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                                {p.exercises.length} exercises
-                                                {p.isTemplate && ' · Template'}
-                                            </div>
-                                        </div>
-                                        <button className="btn btn-secondary btn-sm" onClick={() => startSession(p)}>
-                                            <Play size={13} /> Start
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--color-surface-2)', fontSize: '0.8125rem', color: 'var(--color-text-3)', textAlign: 'center' }}>
+                        To start a workout, go to the <strong style={{ color: 'var(--color-text-2)' }}>Plans</strong> tab
+                    </div>
                 </div>
             )}
 
