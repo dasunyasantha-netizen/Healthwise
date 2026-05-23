@@ -406,9 +406,8 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-sheet" style={{ maxHeight: '95dvh' }}>
-                <div className="modal-handle" />
+        <div className="modal-overlay" style={{ alignItems: 'flex-start', overflowY: 'auto' }}>
+            <div className="modal-sheet" style={{ maxHeight: 'none', borderRadius: 0, minHeight: '100%', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                     <h2>{editing ? 'Edit Plan' : 'New Workout Plan'}</h2>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
@@ -523,7 +522,7 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         )}
 
-                        <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {filtered.length === 0 && !showNewEx && (
                                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
                                     No exercises found.{' '}
