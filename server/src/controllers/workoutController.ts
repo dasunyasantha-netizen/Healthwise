@@ -199,6 +199,14 @@ export const completeWorkoutSession = async (req: AuthRequest, res: Response) =>
     res.json(session);
 };
 
+export const deleteWorkoutSession = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const existing = await prisma.workoutSession.findFirst({ where: { id: req.params.id, userId } });
+    if (!existing) { res.status(404).json({ error: 'Session not found' }); return; }
+    await prisma.workoutSession.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+};
+
 // ─── EXERCISE LOGS ────────────────────────────────────────────────────────────
 
 export const addExerciseLog = async (req: AuthRequest, res: Response) => {

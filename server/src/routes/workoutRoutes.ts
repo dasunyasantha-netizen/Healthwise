@@ -4,7 +4,7 @@ import {
     getWorkoutPlans, getWorkoutPlan, createWorkoutPlan,
     updateWorkoutPlan, deleteWorkoutPlan, duplicateWorkoutPlan,
     getWorkoutSessions, getWorkoutSessionByDate, createWorkoutSession,
-    updateWorkoutSession, completeWorkoutSession,
+    updateWorkoutSession, completeWorkoutSession, deleteWorkoutSession,
     addExerciseLog, updateExerciseLog,
     addSetLog, updateSetLog, deleteSetLog,
     getExerciseHistory
@@ -27,6 +27,7 @@ router.get('/sessions/date/:date', getWorkoutSessionByDate as any);
 router.post('/sessions', createWorkoutSession as any);
 router.put('/sessions/:id', updateWorkoutSession as any);
 router.post('/sessions/:id/complete', completeWorkoutSession as any);
+router.delete('/sessions/:id', deleteWorkoutSession as any);
 router.post('/sessions/:id/exercise-logs', addExerciseLog as any);
 
 // Exercise logs

@@ -1032,6 +1032,7 @@ export default function WorkoutsView() {
     const [libCreating, setLibCreating] = useState(false);
     const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
     const [finishing, setFinishing] = useState(false);
+    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -1183,20 +1184,59 @@ export default function WorkoutsView() {
                     )}
 
                     {/* Completed sessions */}
-                    {sessions.filter(s => s.status === 'completed').map(s => (
-                        <div key={s.id} className="card card-compact" style={{ marginBottom: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div className="exercise-icon"><Dumbbell size={18} /></div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                        {s.exerciseLogs.length} exercises
+                    {sessions.filter(s => s.status === 'completed').map(s => {
+                        const expanded = expandedSessionId === s.id;
+                        return (
+                            <div key={s.id} className="card" style={{ marginBottom: 10 }}>
+                                {/* Header row — tap to expand */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                                    onClick={() => setExpandedSessionId(expanded ? null : s.id)}>
+                                    <div className="exercise-icon"><Dumbbell size={18} /></div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                            {s.exerciseLogs.length} exercises
+                                        </div>
                                     </div>
+                                    <span className="badge badge-green" style={{ marginRight: 4 }}><CheckCircle2 size={12} /> Done</span>
+                                    <ChevronDown size={16} color="var(--color-text-3)"
+                                        style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                                 </div>
-                                <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
+
+                                {/* Expanded: exercise list + delete */}
+                                {expanded && (
+                                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border-light)' }}>
+                                        {s.exerciseLogs.map((log: any) => (
+                                            <div key={log.id} style={{ marginBottom: 12 }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{log.exercise?.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)', marginBottom: 4 }}>
+                                                    {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
+                                                </div>
+                                                {log.sets?.length > 0 && (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                                        {log.sets.map((set: any, i: number) => (
+                                                            <span key={set.id} className="badge badge-gray">
+                                                                Set {i + 1}: {set.timeSeconds ? `${set.timeSeconds}s` : `${set.weight ?? '–'}kg × ${set.reps ?? '–'}`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger, #ef4444)', marginTop: 4 }}
+                                            onClick={async () => {
+                                                if (!confirm('Delete this workout session?')) return;
+                                                await api.workouts.sessions.delete(s.id);
+                                                setSessions(prev => prev.filter(x => x.id !== s.id));
+                                                setExpandedSessionId(null);
+                                            }}>
+                                            <Trash2 size={14} /> Delete session
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {!activeSession && sessions.filter(s => s.status === 'completed').length === 0 && (
                         <div className="empty-state">

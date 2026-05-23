@@ -71,6 +71,7 @@ export const api = {
             create:     (data: unknown) => post<any>('/workouts/sessions', data),
             update:     (id: string, data: unknown) => put<any>(`/workouts/sessions/${id}`, data),
             complete:   (id: string)    => post<any>(`/workouts/sessions/${id}/complete`, {}),
+            delete:     (id: string)    => del<any>(`/workouts/sessions/${id}`),
             addLog:     (id: string, data: unknown) => post<any>(`/workouts/sessions/${id}/exercise-logs`, data),
         },
         exerciseLogs: {
