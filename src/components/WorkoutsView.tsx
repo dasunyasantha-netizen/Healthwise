@@ -240,7 +240,13 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     const [saving, setSaving] = useState(false);
     const [step, setStep] = useState<'info' | 'exercises'>('info');
     const [showNewEx, setShowNewEx] = useState(false);
-    const [newEx, setNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight' });
+    const [newEx, setNewEx] = useState({
+        name: '',
+        category: 'Strength',
+        trackingType: 'reps_weight' as Exercise['trackingType'],
+        equipment: 'Bodyweight',
+        primaryMuscle: 'Chest',
+    });
     const [creatingEx, setCreatingEx] = useState(false);
 
     useEffect(() => {
@@ -287,15 +293,15 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                 category: newEx.category,
                 trackingType: newEx.trackingType,
                 equipment: newEx.equipment,
-                primaryMuscle: 'General',
+                primaryMuscle: newEx.primaryMuscle,
                 secondaryMuscles: [],
-                bodyPartFocus: 'Full Body',
+                bodyPartFocus: newEx.primaryMuscle,
                 isSystem: false,
             });
             setExercises(prev => [...prev, created]);
             addExercise(created);
             setShowNewEx(false);
-            setNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight' });
+            setNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest' });
             setSearch('');
         } catch {} finally { setCreatingEx(false); }
     };
@@ -408,27 +414,83 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                         {showNewEx && (
                             <div style={{
                                 background: 'var(--color-primary-bg)', borderRadius: 'var(--radius-xl)',
-                                padding: '12px 14px', marginBottom: 10,
-                                border: '1.5px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: 10
+                                padding: '14px', marginBottom: 10,
+                                border: '1.5px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: 12
                             }}>
                                 <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>Create new exercise</div>
                                 <input className="input" placeholder="Exercise name" value={newEx.name}
                                     onChange={e => setNewEx(n => ({ ...n, name: e.target.value }))}
                                     onKeyDown={e => e.key === 'Enter' && createAndAdd()} autoFocus />
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                    <select className="input" value={newEx.category} onChange={e => setNewEx(n => ({ ...n, category: e.target.value }))}>
-                                        {['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => <option key={c}>{c}</option>)}
-                                    </select>
-                                    <select className="input" value={newEx.trackingType} onChange={e => setNewEx(n => ({ ...n, trackingType: e.target.value as Exercise['trackingType'] }))}>
-                                        <option value="reps_weight">Reps + Weight</option>
-                                        <option value="reps_only">Reps only</option>
-                                        <option value="time">Time</option>
-                                        <option value="distance">Distance</option>
-                                    </select>
-                                    <select className="input" value={newEx.equipment} onChange={e => setNewEx(n => ({ ...n, equipment: e.target.value }))} style={{ gridColumn: '1 / -1' }}>
-                                        {['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => <option key={eq}>{eq}</option>)}
-                                    </select>
+
+                                {/* Category */}
+                                <div>
+                                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Category</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => (
+                                            <button key={c} onClick={() => setNewEx(n => ({ ...n, category: c }))}
+                                                style={{
+                                                    padding: '5px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', border: 'none',
+                                                    background: newEx.category === c ? 'var(--color-primary)' : 'var(--color-surface)',
+                                                    color: newEx.category === c ? '#fff' : 'var(--color-text-2)',
+                                                    boxShadow: newEx.category === c ? 'none' : '0 0 0 1.5px var(--color-border-light)'
+                                                }}>{c}</button>
+                                        ))}
+                                    </div>
                                 </div>
+
+                                {/* Muscle target */}
+                                <div>
+                                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Muscle Target</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves','Full Body'].map(m => (
+                                            <button key={m} onClick={() => setNewEx(n => ({ ...n, primaryMuscle: m }))}
+                                                style={{
+                                                    padding: '5px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', border: 'none',
+                                                    background: newEx.primaryMuscle === m ? '#3b82f6' : 'var(--color-surface)',
+                                                    color: newEx.primaryMuscle === m ? '#fff' : 'var(--color-text-2)',
+                                                    boxShadow: newEx.primaryMuscle === m ? 'none' : '0 0 0 1.5px var(--color-border-light)'
+                                                }}>{m}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Tracking type */}
+                                <div>
+                                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Tracking</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {[
+                                            { value: 'reps_weight', label: 'Reps + Weight' },
+                                            { value: 'reps_only', label: 'Reps only' },
+                                            { value: 'time', label: 'Time' },
+                                            { value: 'distance', label: 'Distance' },
+                                        ].map(t => (
+                                            <button key={t.value} onClick={() => setNewEx(n => ({ ...n, trackingType: t.value as Exercise['trackingType'] }))}
+                                                style={{
+                                                    padding: '5px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', border: 'none',
+                                                    background: newEx.trackingType === t.value ? '#8b5cf6' : 'var(--color-surface)',
+                                                    color: newEx.trackingType === t.value ? '#fff' : 'var(--color-text-2)',
+                                                    boxShadow: newEx.trackingType === t.value ? 'none' : '0 0 0 1.5px var(--color-border-light)'
+                                                }}>{t.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Equipment */}
+                                <div>
+                                    <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Equipment</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => (
+                                            <button key={eq} onClick={() => setNewEx(n => ({ ...n, equipment: eq }))}
+                                                style={{
+                                                    padding: '5px 12px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer', border: 'none',
+                                                    background: newEx.equipment === eq ? '#f59e0b' : 'var(--color-surface)',
+                                                    color: newEx.equipment === eq ? '#fff' : 'var(--color-text-2)',
+                                                    boxShadow: newEx.equipment === eq ? 'none' : '0 0 0 1.5px var(--color-border-light)'
+                                                }}>{eq}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <button className="btn btn-ghost btn-sm" onClick={() => setShowNewEx(false)}>Cancel</button>
                                     <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}
