@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp } from 'lucide-react';
+import { format, startOfWeek, parseISO } from 'date-fns';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
 
-type Tab = 'today' | 'plans' | 'library';
+type Tab = 'today' | 'plans' | 'library' | 'analytics';
 
 function CustomSelect({ label, value, options, onChange }: {
     label: string;
@@ -647,6 +648,257 @@ function SessionRunner({ session, onClose, onComplete }: {
     );
 }
 
+// ─── WORKOUT ANALYTICS ────────────────────────────────────────────────────────
+
+function WorkoutAnalytics({ sessions, exercises }: { sessions: WorkoutSession[]; exercises: Exercise[] }) {
+    const [selectedExId, setSelectedExId] = useState<string>('');
+    const [exHistory, setExHistory] = useState<any[]>([]);
+    const [loadingEx, setLoadingEx] = useState(false);
+    const [exPickerOpen, setExPickerOpen] = useState(false);
+    const pickerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setExPickerOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    useEffect(() => {
+        if (!selectedExId) return;
+        setLoadingEx(true);
+        api.workouts.history(selectedExId).then(h => setExHistory(h)).catch(() => {}).finally(() => setLoadingEx(false));
+    }, [selectedExId]);
+
+    // Weekly volume: sessions per week
+    const weeklyData = (() => {
+        const map: Record<string, { week: string; sessions: number; sets: number }> = {};
+        sessions.filter(s => s.status === 'completed').forEach(s => {
+            const w = format(startOfWeek(parseISO(s.date), { weekStartsOn: 1 }), 'MMM d');
+            if (!map[w]) map[w] = { week: w, sessions: 0, sets: 0 };
+            map[w].sessions++;
+            map[w].sets += s.exerciseLogs.reduce((acc, l) => acc + (l.sets?.length ?? 0), 0);
+        });
+        return Object.values(map).slice(-8);
+    })();
+
+    // Per-exercise: max weight per session date
+    const exProgressData = exHistory.map(log => {
+        const maxWeight = Math.max(0, ...(log.sets ?? []).filter((s: any) => s.weight).map((s: any) => s.weight));
+        const totalReps = (log.sets ?? []).reduce((acc: number, s: any) => acc + (s.reps ?? 0), 0);
+        const totalSets = log.sets?.length ?? 0;
+        return {
+            date: log.workoutSession?.date ?? '',
+            maxWeight: maxWeight || null,
+            totalReps,
+            totalSets,
+        };
+    }).filter(d => d.date).reverse();
+
+    const selectedEx = exercises.find(e => e.id === selectedExId);
+    const isWeightBased = selectedEx?.trackingType === 'reps_weight';
+    const hasHistory = exProgressData.length > 0;
+
+    // Best lifts
+    const allCompleted = sessions.filter(s => s.status === 'completed');
+    const totalSessions = allCompleted.length;
+    const totalSets = allCompleted.reduce((acc, s) => acc + s.exerciseLogs.reduce((a, l) => a + (l.sets?.length ?? 0), 0), 0);
+    const streak = (() => {
+        const dates = [...new Set(allCompleted.map(s => s.date))].sort().reverse();
+        let count = 0;
+        let cur = new Date();
+        for (const d of dates) {
+            const diff = Math.floor((cur.getTime() - parseISO(d).getTime()) / 86400000);
+            if (diff <= 1) { count++; cur = parseISO(d); } else break;
+        }
+        return count;
+    })();
+
+    return (
+        <div>
+            {/* Summary stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 20 }}>
+                {[
+                    { label: 'Total Sessions', value: totalSessions, color: 'var(--color-primary)' },
+                    { label: 'Total Sets', value: totalSets, color: '#3b82f6' },
+                    { label: 'Day Streak', value: streak, color: '#f59e0b' },
+                ].map(s => (
+                    <div key={s.label} className="stat-box">
+                        <span className="stat-label">{s.label}</span>
+                        <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Weekly volume */}
+            {weeklyData.length > 0 ? (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <BarChart2 size={16} color="var(--color-primary)" />
+                        <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>Weekly Volume</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={140}>
+                        <BarChart data={weeklyData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
+                            <XAxis dataKey="week" tick={{ fontSize: 10, fill: 'var(--color-text-3)' }} />
+                            <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-3)' }} />
+                            <Tooltip
+                                contentStyle={{ fontSize: 12, borderRadius: 10, border: '1px solid var(--color-border-light)' }}
+                                formatter={(v: any, name: string) => [v, name === 'sets' ? 'Sets' : 'Sessions']}
+                            />
+                            <Bar dataKey="sessions" fill="var(--color-primary)" radius={[4,4,0,0]} name="sessions" />
+                            <Bar dataKey="sets" fill="#93c5fd" radius={[4,4,0,0]} name="sets" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', gap: 14, marginTop: 8, justifyContent: 'center' }}>
+                        {[{ color: 'var(--color-primary)', label: 'Sessions' }, { color: '#93c5fd', label: 'Sets' }].map(l => (
+                            <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 2, background: l.color }} />
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{l.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="card" style={{ marginBottom: 16, textAlign: 'center', padding: '24px 16px' }}>
+                    <BarChart2 size={28} color="var(--color-border)" style={{ margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)' }}>Complete workouts to see weekly volume.</p>
+                </div>
+            )}
+
+            {/* Exercise progression */}
+            <div className="card" style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <TrendingUp size={16} color="#3b82f6" />
+                    <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>Exercise Progression</span>
+                </div>
+
+                {/* Exercise picker */}
+                <div style={{ position: 'relative', marginBottom: 12 }} ref={pickerRef}>
+                    <button
+                        onClick={() => setExPickerOpen(v => !v)}
+                        style={{
+                            width: '100%', padding: '11px 14px',
+                            border: `1.5px solid ${exPickerOpen ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            borderRadius: 'var(--radius-lg)', background: 'var(--color-surface)',
+                            fontFamily: 'var(--font)', fontSize: '0.9375rem', color: selectedEx ? 'var(--color-text)' : 'var(--color-text-3)',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            transition: 'border-color .15s',
+                        }}
+                    >
+                        <span>{selectedEx?.name ?? 'Select an exercise...'}</span>
+                        <ChevronDown size={16} color="var(--color-text-3)"
+                            style={{ transform: exPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s', flexShrink: 0 }} />
+                    </button>
+                    {exPickerOpen && (
+                        <div style={{
+                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                            background: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
+                            borderRadius: 'var(--radius-lg)', zIndex: 999, maxHeight: 220, overflowY: 'auto',
+                            boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                        }}>
+                            {exercises.map(ex => (
+                                <button key={ex.id} onClick={() => { setSelectedExId(ex.id); setExPickerOpen(false); }}
+                                    style={{
+                                        width: '100%', padding: '10px 14px', border: 'none', textAlign: 'left',
+                                        background: ex.id === selectedExId ? 'var(--color-primary-bg)' : 'transparent',
+                                        color: ex.id === selectedExId ? 'var(--color-primary)' : 'var(--color-text)',
+                                        fontFamily: 'var(--font)', fontSize: '0.875rem',
+                                        fontWeight: ex.id === selectedExId ? 700 : 400,
+                                        cursor: 'pointer', borderBottom: '1px solid var(--color-border-light)', display: 'block',
+                                    }}>
+                                    <div>{ex.name}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{ex.category} · {ex.primaryMuscle}</div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {!selectedExId && (
+                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)', textAlign: 'center', padding: '12px 0' }}>
+                        Pick an exercise to see your progression chart.
+                    </p>
+                )}
+                {selectedExId && loadingEx && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>Loading...</div>
+                )}
+                {selectedExId && !loadingEx && !hasHistory && (
+                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-3)', textAlign: 'center', padding: '12px 0' }}>
+                        No logged sets for {selectedEx?.name} yet.
+                    </p>
+                )}
+                {selectedExId && !loadingEx && hasHistory && (
+                    <>
+                        {/* Best stats row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                            {isWeightBased && (
+                                <div className="stat-box">
+                                    <span className="stat-label">Best Weight</span>
+                                    <span className="stat-value" style={{ color: 'var(--color-primary)' }}>
+                                        {Math.max(...exProgressData.map(d => d.maxWeight ?? 0))}
+                                    </span>
+                                    <span className="stat-unit">kg</span>
+                                </div>
+                            )}
+                            <div className="stat-box">
+                                <span className="stat-label">Sessions</span>
+                                <span className="stat-value" style={{ color: '#3b82f6' }}>{exProgressData.length}</span>
+                            </div>
+                            <div className="stat-box">
+                                <span className="stat-label">Total Reps</span>
+                                <span className="stat-value" style={{ color: '#f59e0b' }}>
+                                    {exProgressData.reduce((a, d) => a + d.totalReps, 0)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Max weight chart */}
+                        {isWeightBased && exProgressData.some(d => d.maxWeight) && (
+                            <div style={{ marginBottom: 14 }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
+                                    Max Weight per Session (kg)
+                                </div>
+                                <ResponsiveContainer width="100%" height={130}>
+                                    <LineChart data={exProgressData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--color-text-3)' }}
+                                            tickFormatter={d => d ? d.slice(5) : ''} interval="preserveStartEnd" />
+                                        <YAxis tick={{ fontSize: 9, fill: 'var(--color-text-3)' }} domain={['auto', 'auto']} />
+                                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-light)' }}
+                                            formatter={(v: any) => [`${v} kg`, 'Max Weight']} labelFormatter={l => String(l)} />
+                                        <Line type="monotone" dataKey="maxWeight" stroke="var(--color-primary)" strokeWidth={2.5}
+                                            dot={{ r: 3, fill: 'var(--color-primary)', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+
+                        {/* Reps chart */}
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>
+                                Total Reps per Session
+                            </div>
+                            <ResponsiveContainer width="100%" height={110}>
+                                <BarChart data={exProgressData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
+                                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'var(--color-text-3)' }}
+                                        tickFormatter={d => d ? d.slice(5) : ''} interval="preserveStartEnd" />
+                                    <YAxis tick={{ fontSize: 9, fill: 'var(--color-text-3)' }} />
+                                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 10, border: '1px solid var(--color-border-light)' }}
+                                        formatter={(v: any) => [v, 'Total Reps']} labelFormatter={l => String(l)} />
+                                    <Bar dataKey="totalReps" fill="#3b82f6" radius={[4,4,0,0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ─── MAIN WORKOUTS VIEW ───────────────────────────────────────────────────────
 
 export default function WorkoutsView() {
@@ -732,9 +984,9 @@ export default function WorkoutsView() {
             </div>
 
             <div className="tab-bar" style={{ marginBottom: 16 }}>
-                {(['today', 'plans', 'library'] as Tab[]).map(t => (
+                {(['today', 'plans', 'library', 'analytics'] as Tab[]).map(t => (
                     <button key={t} className={`tab-item${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                        {t === 'today' ? 'Today' : t === 'plans' ? 'Plans' : 'Library'}
+                        {t === 'today' ? 'Today' : t === 'plans' ? 'Plans' : t === 'library' ? 'Library' : 'Analytics'}
                     </button>
                 ))}
             </div>
@@ -910,6 +1162,10 @@ export default function WorkoutsView() {
                         </div>
                     ))}
                 </div>
+            )}
+
+            {tab === 'analytics' && (
+                <WorkoutAnalytics sessions={sessions} exercises={exercises} />
             )}
 
             {showBuilder && <WorkoutPlanBuilder onClose={() => { setShowBuilder(false); setEditingPlan(undefined); }} onSaved={load} editing={editingPlan} />}
