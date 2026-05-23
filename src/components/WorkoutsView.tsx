@@ -35,6 +35,41 @@ const MUSCLE_LABELS: Record<string, string> = {
     'Neck':               'Cervical muscles',
 };
 
+// Maps any specific primaryMuscle value → one of 9 major groups for the filter dropdown
+const MUSCLE_GROUP: Record<string, string> = {
+    // Chest
+    'Chest': 'Chest', 'Pectoralis Major': 'Chest', 'Pectoralis Major (Upper)': 'Chest',
+    'Pectoralis Minor': 'Chest', 'Serratus Anterior': 'Chest',
+    // Back
+    'Back': 'Back', 'Latissimus Dorsi': 'Back', 'Rhomboids': 'Back',
+    'Trapezius': 'Back', 'Erector Spinae': 'Back', 'Teres Major': 'Back',
+    'Teres Minor': 'Back', 'Infraspinatus': 'Back', 'Rear Deltoid': 'Back',
+    // Shoulders
+    'Shoulders': 'Shoulders', 'Anterior Deltoid': 'Shoulders', 'Lateral Deltoid': 'Shoulders',
+    'Posterior Deltoid': 'Shoulders', 'Rotator Cuff': 'Shoulders',
+    // Arms
+    'Biceps': 'Arms', 'Biceps Brachii': 'Arms', 'Brachialis': 'Arms', 'Brachioradialis': 'Arms',
+    'Triceps': 'Arms', 'Triceps Brachii': 'Arms', 'Triceps Brachii (Long Head)': 'Arms',
+    'Forearms': 'Arms', 'Wrist Flexors': 'Arms', 'Wrist Extensors': 'Arms',
+    // Core
+    'Core': 'Core', 'Rectus Abdominis': 'Core', 'Rectus Abdominis (Lower)': 'Core',
+    'Obliques': 'Core', 'Transverse Abdominis': 'Core', 'Hip Flexors': 'Core',
+    // Legs
+    'Quads': 'Legs', 'Quadriceps': 'Legs', 'Rectus Femoris': 'Legs',
+    'Hamstrings': 'Legs', 'Glutes': 'Legs', 'Gluteus Maximus': 'Legs',
+    'Gluteus Medius': 'Legs', 'Hip Abductors': 'Legs', 'Hip Adductors': 'Legs',
+    'Calves': 'Legs', 'Gastrocnemius': 'Legs', 'Soleus': 'Legs',
+    'Tibialis Anterior': 'Legs', 'Neck': 'Legs',
+    // Full Body
+    'Full Body': 'Full Body',
+};
+
+const MAJOR_GROUPS = ['Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Legs', 'Full Body'];
+
+function getMajorGroup(muscle: string): string {
+    return MUSCLE_GROUP[muscle] ?? 'Other';
+}
+
 function CustomSelect({ label, value, options, onChange }: {
     label: string;
     value: string;
@@ -371,11 +406,10 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
         (e.name.toLowerCase().includes(search.toLowerCase()) ||
          e.category.toLowerCase().includes(search.toLowerCase()) ||
          (e.primaryMuscle ?? '').toLowerCase().includes(search.toLowerCase())) &&
-        (!muscleFilter || e.primaryMuscle === muscleFilter)
+        (!muscleFilter || getMajorGroup(e.primaryMuscle ?? '') === muscleFilter)
     );
-    const muscles = [...new Set(exercises.map(e => e.primaryMuscle).filter(Boolean))].sort();
     const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
-        const key = ex.primaryMuscle || 'Other';
+        const key = getMajorGroup(ex.primaryMuscle ?? '');
         if (!acc[key]) acc[key] = [];
         acc[key].push(ex);
         return acc;
@@ -561,14 +595,14 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         )}
 
-                        {/* Muscle filter dropdown */}
+                        {/* Muscle group filter dropdown */}
                         <div style={{ marginBottom: 10 }}>
                             <CustomSelect
                                 label=""
                                 value={muscleFilter}
                                 options={[
                                     { value: '', label: 'All muscle groups' },
-                                    ...muscles.map(m => ({ value: m, label: MUSCLE_LABELS[m] ? `${m} — ${MUSCLE_LABELS[m]}` : m }))
+                                    ...MAJOR_GROUPS.map(g => ({ value: g, label: g }))
                                 ]}
                                 onChange={v => setMuscleFilter(v)}
                             />
@@ -584,24 +618,16 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                                 </button>
                             </div>
                         ) : (
-                            Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([muscle, exList]) => (
-                                <div key={muscle} style={{ marginBottom: 10 }}>
+                            MAJOR_GROUPS.filter(g => grouped[g]?.length).map(group => (
+                                <div key={group} style={{ marginBottom: 10 }}>
                                     <div style={{
-                                        fontSize: '0.6875rem', fontWeight: 800, color: 'var(--color-text-3)',
+                                        fontSize: '0.6875rem', fontWeight: 800, color: 'var(--color-primary)',
                                         textTransform: 'uppercase', letterSpacing: '.07em',
                                         padding: '3px 2px 3px', marginBottom: 3,
-                                        borderBottom: '1px solid var(--color-border-light)',
-                                        display: 'flex', alignItems: 'baseline', gap: 6,
-                                    }}>
-                                        <span>{muscle}</span>
-                                        {MUSCLE_LABELS[muscle] && (
-                                            <span style={{ fontSize: '0.625rem', fontWeight: 600, color: 'var(--color-text-3)', textTransform: 'none', letterSpacing: 0, opacity: 0.7 }}>
-                                                {MUSCLE_LABELS[muscle]}
-                                            </span>
-                                        )}
-                                    </div>
+                                        borderBottom: '1.5px solid var(--color-primary-bg)',
+                                    }}>{group}</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                        {exList.map(ex => {
+                                        {(grouped[group] ?? []).map(ex => {
                                             const isAdded = selected.some(s => s.exercise.id === ex.id);
                                             return (
                                                 <div key={ex.id} onClick={() => addExercise(ex)}
