@@ -7,6 +7,34 @@ import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
 
 type Tab = 'today' | 'plans' | 'library' | 'analytics';
 
+const MUSCLE_LABELS: Record<string, string> = {
+    'Anterior Deltoid':   'Front shoulder',
+    'Biceps Brachii':     'Upper arm (front)',
+    'Brachialis':         'Under bicep',
+    'Calves':             'Lower leg (back)',
+    'Chest':              'Pectorals',
+    'Core':               'Abs & stability',
+    'Erector Spinae':     'Lower back',
+    'Full Body':          'Multiple muscles',
+    'Glutes':             'Buttocks',
+    'Hamstrings':         'Back of thigh',
+    'Infraspinatus':      'Rear shoulder (rotator)',
+    'Latissimus Dorsi':   'Side back (lats)',
+    'Lateral Deltoid':    'Side shoulder',
+    'Posterior Deltoid':  'Rear shoulder',
+    'Quads':              'Front of thigh',
+    'Rhomboids':          'Upper mid-back',
+    'Shoulders':          'Deltoids',
+    'Back':               'Upper & mid back',
+    'Biceps':             'Upper arm (front)',
+    'Triceps':            'Upper arm (back)',
+    'Trapezius':          'Upper back & neck',
+    'Tibialis Anterior':  'Front of shin',
+    'Soleus':             'Deep calf',
+    'Rectus Femoris':     'Front thigh (quad)',
+    'Neck':               'Cervical muscles',
+};
+
 function CustomSelect({ label, value, options, onChange }: {
     label: string;
     value: string;
@@ -533,24 +561,17 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         )}
 
-                        {/* Muscle filter pills */}
-                        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 10, scrollbarWidth: 'none' }}>
-                            <button onClick={() => setMuscleFilter('')} style={{
-                                padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
-                                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                                background: !muscleFilter ? 'var(--color-primary)' : 'var(--color-surface)',
-                                color: !muscleFilter ? '#fff' : 'var(--color-text-2)',
-                                boxShadow: !muscleFilter ? 'none' : '0 0 0 1.5px var(--color-border-light)',
-                            }}>All</button>
-                            {muscles.map(m => (
-                                <button key={m} onClick={() => setMuscleFilter(muscleFilter === m ? '' : m)} style={{
-                                    padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
-                                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                                    background: muscleFilter === m ? 'var(--color-primary)' : 'var(--color-surface)',
-                                    color: muscleFilter === m ? '#fff' : 'var(--color-text-2)',
-                                    boxShadow: muscleFilter === m ? 'none' : '0 0 0 1.5px var(--color-border-light)',
-                                }}>{m}</button>
-                            ))}
+                        {/* Muscle filter dropdown */}
+                        <div style={{ marginBottom: 10 }}>
+                            <CustomSelect
+                                label=""
+                                value={muscleFilter}
+                                options={[
+                                    { value: '', label: 'All muscle groups' },
+                                    ...muscles.map(m => ({ value: m, label: MUSCLE_LABELS[m] ? `${m} — ${MUSCLE_LABELS[m]}` : m }))
+                                ]}
+                                onChange={v => setMuscleFilter(v)}
+                            />
                         </div>
 
                         {/* Grouped exercise list */}
@@ -564,25 +585,40 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                             </div>
                         ) : (
                             Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([muscle, exList]) => (
-                                <div key={muscle} style={{ marginBottom: 12 }}>
+                                <div key={muscle} style={{ marginBottom: 10 }}>
                                     <div style={{
                                         fontSize: '0.6875rem', fontWeight: 800, color: 'var(--color-text-3)',
                                         textTransform: 'uppercase', letterSpacing: '.07em',
-                                        padding: '4px 2px', marginBottom: 4,
+                                        padding: '3px 2px 3px', marginBottom: 3,
                                         borderBottom: '1px solid var(--color-border-light)',
-                                    }}>{muscle}</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        display: 'flex', alignItems: 'baseline', gap: 6,
+                                    }}>
+                                        <span>{muscle}</span>
+                                        {MUSCLE_LABELS[muscle] && (
+                                            <span style={{ fontSize: '0.625rem', fontWeight: 600, color: 'var(--color-text-3)', textTransform: 'none', letterSpacing: 0, opacity: 0.7 }}>
+                                                {MUSCLE_LABELS[muscle]}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                         {exList.map(ex => {
                                             const isAdded = selected.some(s => s.exercise.id === ex.id);
                                             return (
-                                                <div key={ex.id} className="exercise-card" onClick={() => addExercise(ex)}
-                                                    style={{ opacity: isAdded ? 0.5 : 1 }}>
-                                                    <div className="exercise-icon"><Dumbbell size={18} /></div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{ex.name}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>{ex.category} · {ex.equipment}</div>
+                                                <div key={ex.id} onClick={() => addExercise(ex)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: 10,
+                                                        padding: '7px 10px', borderRadius: 'var(--radius-lg)',
+                                                        background: isAdded ? 'var(--color-primary-bg)' : 'var(--color-surface-2)',
+                                                        cursor: 'pointer', transition: 'background .12s',
+                                                        border: isAdded ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                    }}>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: isAdded ? 'var(--color-primary)' : 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                                                        <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-3)' }}>{ex.equipment}</div>
                                                     </div>
-                                                    {isAdded ? <CheckCircle2 size={18} color="var(--color-primary)" /> : <Plus size={16} color="var(--color-text-3)" />}
+                                                    {isAdded
+                                                        ? <CheckCircle2 size={16} color="var(--color-primary)" strokeWidth={2.5} />
+                                                        : <Plus size={15} color="var(--color-text-3)" />}
                                                 </div>
                                             );
                                         })}
