@@ -686,19 +686,24 @@ function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
     const [notes, setNotes] = useState<any[]>([]);
     const [newNote, setNewNote] = useState('');
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
     const today = format(new Date(), 'yyyy-MM-dd');
 
     useEffect(() => {
+        if (!exerciseId) return;
         api.exercises.notes.list(exerciseId).then(setNotes).catch(() => {});
     }, [exerciseId]);
 
     const addNote = async () => {
-        if (!newNote.trim()) return;
+        if (!newNote.trim() || !exerciseId) return;
         setSaving(true);
+        setError('');
         try {
             const created = await api.exercises.notes.create(exerciseId, { note: newNote.trim(), date: today });
             setNotes(prev => [created, ...prev]);
             setNewNote('');
+        } catch (e: any) {
+            setError(e.message || 'Failed to save note');
         } finally { setSaving(false); }
     };
 
@@ -720,7 +725,7 @@ function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
                 </div>
 
                 {/* Add note input */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: error ? 8 : 16 }}>
                     <textarea
                         className="input"
                         placeholder="Add a note..."
@@ -732,9 +737,10 @@ function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
                     />
                     <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-end' }}
                         onClick={addNote} disabled={saving || !newNote.trim()}>
-                        <Plus size={14} />
+                        {saving ? '...' : <Plus size={14} />}
                     </button>
                 </div>
+                {error && <div style={{ fontSize: '0.8rem', color: '#ef4444', marginBottom: 12 }}>{error}</div>}
 
                 {/* Notes list */}
                 <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -1245,7 +1251,7 @@ export default function WorkoutsView() {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</span>
                                                 <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
-                                                    onClick={() => setNotesModal({ exerciseId: log.exerciseId, exerciseName: log.exercise.name })}>
+                                                    onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise.name })}>
                                                     Notes
                                                 </button>
                                             </div>
@@ -1313,7 +1319,7 @@ export default function WorkoutsView() {
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</span>
                                                     <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
-                                                        onClick={() => setNotesModal({ exerciseId: log.exerciseId, exerciseName: log.exercise?.name ?? '' })}>
+                                                        onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}>
                                                         Notes
                                                     </button>
                                                 </div>
