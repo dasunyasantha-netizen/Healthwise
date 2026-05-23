@@ -3,7 +3,6 @@ import { RefreshCw, Dumbbell, UtensilsCrossed, Timer, Ruler, Flame, CheckCircle2
 import { format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { DashboardData, HealthMeasurement, ViewMode } from '../types';
-import FastingTimerCard from './FastingTimerCard';
 import CalendarMini from './CalendarMini';
 import { api } from '../services/api';
 
@@ -171,11 +170,8 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
         );
     }
 
-    const meals = data?.meals;
     const habits = data?.habits;
     const measurement = data?.measurement;
-    const workouts = data?.workouts;
-    const fasting = data?.fasting;
     const latest = measurement?.latest;
 
     const motivationalMsg = (() => {
@@ -242,11 +238,6 @@ export default function Dashboard({ data, loading, onRefresh, onNavigate }: Prop
                         </button>
                     ))}
                 </div>
-            </div>
-
-            {/* Fasting timer */}
-            <div style={{ marginBottom: 16 }}>
-                <FastingTimerCard session={fasting ?? null} onNavigate={() => onNavigate('meals')} />
             </div>
 
             {/* Habits today */}
