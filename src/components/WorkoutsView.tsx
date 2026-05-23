@@ -1032,7 +1032,7 @@ export default function WorkoutsView() {
     const [libCreating, setLibCreating] = useState(false);
     const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
     const [finishing, setFinishing] = useState(false);
-    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+    const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(new Set());
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -1185,12 +1185,17 @@ export default function WorkoutsView() {
 
                     {/* Completed sessions — expanded by default, collapsible */}
                     {sessions.filter(s => s.status === 'completed').map(s => {
-                        const collapsed = expandedSessionId === `collapsed-${s.id}`;
+                        const collapsed = collapsedSessionIds.has(s.id);
+                        const toggle = () => setCollapsedSessionIds(prev => {
+                            const next = new Set(prev);
+                            next.has(s.id) ? next.delete(s.id) : next.add(s.id);
+                            return next;
+                        });
                         return (
                             <div key={s.id} className="card" style={{ marginBottom: 16, border: '1.5px solid var(--color-border)' }}>
                                 {/* Header — tap to collapse/expand */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: collapsed ? 0 : 16, cursor: 'pointer' }}
-                                    onClick={() => setExpandedSessionId(collapsed ? null : `collapsed-${s.id}`)}>
+                                    onClick={toggle}>
                                     <div className="exercise-icon"><Dumbbell size={18} /></div>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.workoutPlan?.name || 'Workout'}</div>
