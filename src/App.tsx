@@ -32,9 +32,19 @@ export default function App() {
             const stored = localStorage.getItem('healthwise_token');
             const storedUser = localStorage.getItem('healthwise_user');
             if (stored && storedUser) {
+                const base: User = JSON.parse(storedUser);
                 setToken(stored);
-                setUser(JSON.parse(storedUser));
+                setUser(base);
                 setLoading(false);
+                // Refresh avatar silently
+                api.user.profile().then((profile: any) => {
+                    const updated: User = {
+                        ...base,
+                        avatarUrl: profile.avatarUrl || profile.avatar_url || base.avatarUrl,
+                    };
+                    setUser(updated);
+                    localStorage.setItem('healthwise_user', JSON.stringify(updated));
+                }).catch(() => {});
             } else {
                 setLoading(false);
             }
@@ -43,15 +53,24 @@ export default function App() {
 
     const bootstrapUser = async (t: string) => {
         try {
-            // Decode JWT payload to get user info
             const payload = JSON.parse(atob(t.split('.')[1]));
             const storedUser = localStorage.getItem('healthwise_user');
-            if (storedUser) {
-                setUser(JSON.parse(storedUser));
-            } else {
-                setUser({ id: payload.userId, name: 'User', email: '' });
-            }
+            const base: User = storedUser
+                ? JSON.parse(storedUser)
+                : { id: payload.userId, name: 'User', email: '' };
             setToken(t);
+            setUser(base);
+            // Fetch profile in background to get avatarUrl
+            api.user.profile().then((profile: any) => {
+                const updated: User = {
+                    ...base,
+                    name: profile.name || base.name,
+                    email: profile.email || base.email,
+                    avatarUrl: profile.avatarUrl || profile.avatar_url || base.avatarUrl,
+                };
+                setUser(updated);
+                localStorage.setItem('healthwise_user', JSON.stringify(updated));
+            }).catch(() => {});
         } catch {
             logout();
         } finally {

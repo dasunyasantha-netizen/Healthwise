@@ -36,6 +36,10 @@ export const api = {
             post<{ token: string; user: any }>('/auth/sso-login', data),
     },
 
+    user: {
+        profile: () => get<any>('/user/profile'),
+    },
+
     dashboard: {
         get: () => get<any>('/dashboard'),
         weekly: () => get<any>('/dashboard/weekly'),

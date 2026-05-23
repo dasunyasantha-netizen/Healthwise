@@ -12,6 +12,41 @@ const getSyswiseUrl = () => {
     return isLocal ? 'http://localhost:3100' : 'https://syswise.lk';
 };
 
+function Avatar({ user }: { user: User }) {
+    const initials = user.name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(w => w[0].toUpperCase())
+        .join('');
+
+    if (user.avatarUrl) {
+        return (
+            <img
+                src={user.avatarUrl}
+                alt={user.name}
+                style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    objectFit: 'cover', border: '2px solid var(--color-border-light)',
+                    flexShrink: 0
+                }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+        );
+    }
+
+    return (
+        <div style={{
+            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+            background: 'var(--color-primary)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '0.75rem', fontWeight: 700, letterSpacing: '.02em'
+        }}>
+            {initials || '?'}
+        </div>
+    );
+}
+
 export default function Header({ user, onLogout }: Props) {
     return (
         <header className="app-header">
@@ -19,7 +54,8 @@ export default function Header({ user, onLogout }: Props) {
                 <div style={{
                     width: 32, height: 32, borderRadius: 10,
                     background: 'var(--color-primary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0
                 }}>
                     <Activity size={18} color="#fff" strokeWidth={2.5} />
                 </div>
@@ -31,7 +67,8 @@ export default function Header({ user, onLogout }: Props) {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Avatar user={user} />
                 <a href={getSyswiseUrl()} className="btn btn-ghost btn-icon" title="Back to SysWise">
                     <Home size={18} />
                 </a>
