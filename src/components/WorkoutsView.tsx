@@ -1151,7 +1151,7 @@ function DayStrip({ selectedDate, onSelect }: { selectedDate: string; onSelect: 
                         flexShrink: 0, width: 48, height: 64,
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
                         borderRadius: 14, border, background: bg, color, cursor: 'pointer',
-                        boxShadow: shadow, transform, transition: 'all .15s',
+                        boxShadow: shadow, transform, transition: 'all .15s', fontFamily: 'var(--font)',
                     }}>
                         <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', opacity: 0.75 }}>
                             {format(dateObj, 'EEE')}
