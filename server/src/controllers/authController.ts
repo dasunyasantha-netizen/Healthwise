@@ -12,10 +12,10 @@ export const ssoLogin = async (req: Request, res: Response) => {
             return;
         }
 
-        let userId = syswiseUserId ? parseInt(syswiseUserId, 10) : null;
+        let userId = syswiseUserId ? parseInt(String(syswiseUserId), 10) : null;
         if (!userId) {
             const payload = JSON.parse(Buffer.from(ssoToken.split('.')[1], 'base64').toString());
-            userId = payload.user_id || payload.id || null;
+            userId = parseInt(String(payload.user_id || payload.id || '0'), 10) || null;
         }
 
         if (!userId || isNaN(userId)) {

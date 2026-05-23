@@ -5,7 +5,7 @@
 param(
     [string]$Server = "syswise-hetzner",
     [string]$RemoteBase = "/var/www/healthwise",
-    [string]$RemoteServerBase = "/var/www/healthwise-server"
+    [string]$RemoteServerBase = "/var/www/healthwise/server"
 )
 
 $ErrorActionPreference = "Stop"

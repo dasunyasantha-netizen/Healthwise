@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import prisma from '../prisma';
 
 export interface AuthRequest extends Request {
     user?: { userId: number; syswiseToken?: string };
 }
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -14,12 +15,18 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
         return;
     }
 
-    jwt.verify(token, process.env.JWT_SECRET as string, (err: any, decoded: any) => {
-        if (err) {
-            res.sendStatus(403);
-            return;
-        }
-        req.user = { userId: decoded.userId as number, syswiseToken: decoded.syswiseToken };
-        next();
-    });
+    let decoded: any;
+    try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+    } catch {
+        res.sendStatus(403);
+        return;
+    }
+
+    const userId = decoded.userId as number;
+
+    // Always read fresh syswiseToken from DB — the one embedded in the JWT is stale after re-login
+    const session = await prisma.session.findUnique({ where: { userId } });
+    req.user = { userId, syswiseToken: session?.syswiseToken ?? decoded.syswiseToken };
+    next();
 };

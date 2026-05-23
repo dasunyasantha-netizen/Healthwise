@@ -1,7 +1,15 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-const SYSWISE_API = process.env.SYSWISE_API_URL || 'http://localhost:8100';
+const SYSWISE_API = process.env.SYSWISE_API_URL || 'http://localhost:8000';
+
+function normalizeProfile(d: any) {
+    return {
+        ...d,
+        name: d.name || [d.first_name, d.last_name].filter(Boolean).join(' ') || '',
+        avatarUrl: d.avatarUrl || d.avatar_url || null,
+    };
+}
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
     const syswiseToken = req.user?.syswiseToken;
@@ -11,7 +19,8 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
             headers: { Authorization: `Bearer ${syswiseToken}` },
         });
         const data = await upstream.json();
-        res.status(upstream.ok ? 200 : upstream.status).json(data);
+        if (!upstream.ok) return res.status(upstream.status).json(data);
+        res.json(normalizeProfile(data));
     } catch {
         res.status(502).json({ error: 'Could not reach SysWise API' });
     }
