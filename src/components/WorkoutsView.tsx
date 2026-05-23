@@ -1122,13 +1122,14 @@ export default function WorkoutsView() {
     const [finishing, setFinishing] = useState(false);
     const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(new Set());
     const [notesModal, setNotesModal] = useState<{ exerciseId: string; exerciseName: string } | null>(null);
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
         try {
             const [p, s, e] = await Promise.all([
                 api.workouts.plans.list(),
-                api.workouts.sessions.byDate(today),
+                api.workouts.sessions.byDate(selectedDate),
                 api.exercises.list()
             ]);
             setPlans(p);
@@ -1138,6 +1139,12 @@ export default function WorkoutsView() {
     };
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        api.workouts.sessions.byDate(selectedDate).then(setSessions).catch(() => {});
+        setCollapsedSessionIds(new Set());
+        if (selectedDate !== today) setActiveSession(null);
+    }, [selectedDate]);
 
     useEffect(() => {
         if (!activeSession) return;
@@ -1226,6 +1233,38 @@ export default function WorkoutsView() {
 
             {tab === 'today' && (
                 <div>
+                    {/* Day slider */}
+                    {(() => {
+                        const days = Array.from({ length: 7 }, (_, i) => {
+                            const d = new Date();
+                            d.setDate(d.getDate() - (6 - i));
+                            return format(d, 'yyyy-MM-dd');
+                        });
+                        return (
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 2 }}>
+                                {days.map(d => {
+                                    const isSelected = d === selectedDate;
+                                    const isToday = d === today;
+                                    const dayLabel = isToday ? 'Today' : format(new Date(d + 'T00:00:00'), 'EEE');
+                                    const dateNum = format(new Date(d + 'T00:00:00'), 'd');
+                                    return (
+                                        <button key={d} onClick={() => setSelectedDate(d)} style={{
+                                            flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                            gap: 2, padding: '8px 10px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                                            background: isSelected ? 'var(--color-primary)' : 'var(--color-surface-2)',
+                                            color: isSelected ? '#fff' : 'var(--color-text-2)',
+                                            transition: 'background .15s',
+                                            minWidth: 44,
+                                        }}>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', opacity: isSelected ? 1 : 0.7 }}>{dayLabel}</span>
+                                            <span style={{ fontSize: '1rem', fontWeight: 700, lineHeight: 1 }}>{dateNum}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
+
                     {/* Active in-progress session */}
                     {activeSession && (
                         <div className="card" style={{ marginBottom: 16, border: '2px solid var(--color-primary)' }}>
@@ -1345,12 +1384,12 @@ export default function WorkoutsView() {
                     {!activeSession && sessions.filter(s => s.status === 'completed').length === 0 && (
                         <div className="empty-state">
                             <div className="empty-state-icon"><Dumbbell size={24} /></div>
-                            <h3 style={{ marginBottom: 8 }}>No workouts today</h3>
-                            <p style={{ fontSize: '0.875rem' }}>Start a plan from the Plans section.</p>
+                            <h3 style={{ marginBottom: 8 }}>No workouts {selectedDate === today ? 'today' : 'on this day'}</h3>
+                            {selectedDate === today && <p style={{ fontSize: '0.875rem' }}>Start a plan from the Plans section.</p>}
                         </div>
                     )}
 
-                    {!activeSession && (
+                    {!activeSession && selectedDate === today && (
                         <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--color-surface-2)', fontSize: '0.8125rem', color: 'var(--color-text-3)', textAlign: 'center' }}>
                             To start a workout, go to the <strong style={{ color: 'var(--color-text-2)' }}>Plans</strong> tab
                         </div>
