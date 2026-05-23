@@ -519,19 +519,28 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                                         background: 'var(--color-primary-bg)', marginBottom: 6
                                     }}>
                                         <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600 }}>{s.exercise.name}</span>
-                                        <div style={{ display: 'flex', gap: 6 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                             {s.exercise.trackingType === 'time' ? (
-                                                <input className="set-input" type="number" placeholder="sec"
-                                                    value={s.targetTimeSeconds || ''} style={{ width: 60 }}
-                                                    onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetTimeSeconds: parseInt(e.target.value) || 0 } : x))} />
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                                    <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase' }}>sec</span>
+                                                    <input className="set-input" type="number"
+                                                        value={s.targetTimeSeconds || ''} style={{ width: 52, textAlign: 'center' }}
+                                                        onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetTimeSeconds: parseInt(e.target.value) || 0 } : x))} />
+                                                </div>
                                             ) : (
                                                 <>
-                                                    <input className="set-input" type="number" placeholder="sets"
-                                                        value={s.targetSets || ''} style={{ width: 48 }}
-                                                        onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetSets: parseInt(e.target.value) || 0 } : x))} />
-                                                    <input className="set-input" type="number" placeholder="reps"
-                                                        value={s.targetReps || ''} style={{ width: 48 }}
-                                                        onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetReps: parseInt(e.target.value) || 0 } : x))} />
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                                        <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase' }}>sets</span>
+                                                        <input className="set-input" type="number"
+                                                            value={s.targetSets || ''} style={{ width: 44, textAlign: 'center' }}
+                                                            onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetSets: parseInt(e.target.value) || 0 } : x))} />
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                                        <span style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--color-text-3)', textTransform: 'uppercase' }}>reps</span>
+                                                        <input className="set-input" type="number"
+                                                            value={s.targetReps || ''} style={{ width: 44, textAlign: 'center' }}
+                                                            onChange={e => setSelected(prev => prev.map(x => x.exercise.id === s.exercise.id ? { ...x, targetReps: parseInt(e.target.value) || 0 } : x))} />
+                                                    </div>
                                                 </>
                                             )}
                                         </div>
