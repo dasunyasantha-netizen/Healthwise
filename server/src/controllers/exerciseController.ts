@@ -94,3 +94,31 @@ export const deleteExercise = async (req: AuthRequest, res: Response) => {
     await prisma.exercise.delete({ where: { id } });
     res.json({ success: true });
 };
+
+// ─── EXERCISE NOTES ──────────────────────────────────────────────────────────
+
+export const getExerciseNotes = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const notes = await prisma.exerciseNote.findMany({
+        where: { exerciseId: req.params.id, userId },
+        orderBy: { date: 'desc' }
+    });
+    res.json(notes);
+};
+
+export const createExerciseNote = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { note, date } = req.body;
+    const created = await prisma.exerciseNote.create({
+        data: { userId, exerciseId: req.params.id, note, date }
+    });
+    res.status(201).json(created);
+};
+
+export const deleteExerciseNote = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const existing = await prisma.exerciseNote.findFirst({ where: { id: req.params.noteId, userId } });
+    if (!existing) { res.status(404).json({ error: 'Note not found' }); return; }
+    await prisma.exerciseNote.delete({ where: { id: req.params.noteId } });
+    res.json({ success: true });
+};

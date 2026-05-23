@@ -49,6 +49,18 @@ model Exercise {
 
   workoutPlanExercises WorkoutPlanExercise[]
   workoutExerciseLogs  WorkoutExerciseLog[]
+  notes                ExerciseNote[]
+}
+
+model ExerciseNote {
+  id         String   @id @default(uuid())
+  userId     Int
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  note       String
+  date       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // ─── WORKOUT PLANS ────────────────────────────────────────────────────────────

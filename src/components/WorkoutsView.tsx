@@ -678,6 +678,88 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
     );
 }
 
+// ─── EXERCISE NOTES MODAL ────────────────────────────────────────────────────
+
+function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
+    exerciseId: string; exerciseName: string; onClose: () => void;
+}) {
+    const [notes, setNotes] = useState<any[]>([]);
+    const [newNote, setNewNote] = useState('');
+    const [saving, setSaving] = useState(false);
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    useEffect(() => {
+        api.exercises.notes.list(exerciseId).then(setNotes).catch(() => {});
+    }, [exerciseId]);
+
+    const addNote = async () => {
+        if (!newNote.trim()) return;
+        setSaving(true);
+        try {
+            const created = await api.exercises.notes.create(exerciseId, { note: newNote.trim(), date: today });
+            setNotes(prev => [created, ...prev]);
+            setNewNote('');
+        } finally { setSaving(false); }
+    };
+
+    const deleteNote = async (noteId: string) => {
+        await api.exercises.notes.delete(exerciseId, noteId);
+        setNotes(prev => prev.filter(n => n.id !== noteId));
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose} style={{ alignItems: 'flex-end' }}>
+            <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80dvh', display: 'flex', flexDirection: 'column' }}>
+                <div className="modal-handle" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div>
+                        <h2 style={{ fontSize: '1rem', marginBottom: 2 }}>Notes</h2>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-3)' }}>{exerciseName}</div>
+                    </div>
+                    <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
+                </div>
+
+                {/* Add note input */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                    <textarea
+                        className="input"
+                        placeholder="Add a note..."
+                        value={newNote}
+                        onChange={e => setNewNote(e.target.value)}
+                        rows={2}
+                        style={{ flex: 1, resize: 'none', fontSize: '0.9rem', padding: '10px 12px' }}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); } }}
+                    />
+                    <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-end' }}
+                        onClick={addNote} disabled={saving || !newNote.trim()}>
+                        <Plus size={14} />
+                    </button>
+                </div>
+
+                {/* Notes list */}
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {notes.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
+                            No notes yet. Add your first note above.
+                        </div>
+                    ) : (
+                        notes.map(n => (
+                            <div key={n.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', position: 'relative' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)', marginBottom: 4 }}>{n.date}</div>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--color-text)', lineHeight: 1.5, paddingRight: 28 }}>{n.note}</div>
+                                <button className="btn btn-ghost btn-icon" style={{ position: 'absolute', top: 8, right: 8, padding: 4 }}
+                                    onClick={() => deleteNote(n.id)}>
+                                    <Trash2 size={13} color="var(--color-text-3)" />
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── WORKOUT SESSION RUNNER ───────────────────────────────────────────────────
 
 function SessionRunner({ session, onClose, onComplete }: {
@@ -1033,6 +1115,7 @@ export default function WorkoutsView() {
     const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
     const [finishing, setFinishing] = useState(false);
     const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(new Set());
+    const [notesModal, setNotesModal] = useState<{ exerciseId: string; exerciseName: string } | null>(null);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -1159,7 +1242,13 @@ export default function WorkoutsView() {
                                 <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</span>
+                                                <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
+                                                    onClick={() => setNotesModal({ exerciseId: log.exerciseId, exerciseName: log.exercise.name })}>
+                                                    Notes
+                                                </button>
+                                            </div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
                                                 {getMajorGroup(log.exercise.primaryMuscle ?? '')} · {log.exercise.trackingType === 'time' ? 'Time-based' : log.exercise.trackingType === 'reps_only' ? 'Reps only' : 'Reps + Weight'}
                                             </div>
@@ -1221,7 +1310,13 @@ export default function WorkoutsView() {
                                     <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</span>
+                                                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
+                                                        onClick={() => setNotesModal({ exerciseId: log.exerciseId, exerciseName: log.exercise?.name ?? '' })}>
+                                                        Notes
+                                                    </button>
+                                                </div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
                                                     {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
                                                 </div>
@@ -1380,6 +1475,7 @@ export default function WorkoutsView() {
 
             {showBuilder && <WorkoutPlanBuilder onClose={() => { setShowBuilder(false); setEditingPlan(undefined); }} onSaved={load} editing={editingPlan} />}
             {selectedExercise && <ExerciseDetailModal exercise={selectedExercise} onClose={() => setSelectedExercise(null)} />}
+            {notesModal && <ExerciseNotesModal exerciseId={notesModal.exerciseId} exerciseName={notesModal.exerciseName} onClose={() => setNotesModal(null)} />}
         </div>
     );
 }

@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/authMiddleware';
 import {
     getExercises, getExercise, createExercise,
-    updateExercise, deleteExercise
+    updateExercise, deleteExercise,
+    getExerciseNotes, createExerciseNote, deleteExerciseNote
 } from '../controllers/exerciseController';
 
 const router = Router();
@@ -12,4 +13,7 @@ router.get('/:id', getExercise as any);
 router.post('/', createExercise as any);
 router.put('/:id', updateExercise as any);
 router.delete('/:id', deleteExercise as any);
+router.get('/:id/notes', getExerciseNotes as any);
+router.post('/:id/notes', createExerciseNote as any);
+router.delete('/:id/notes/:noteId', deleteExerciseNote as any);
 export default router;

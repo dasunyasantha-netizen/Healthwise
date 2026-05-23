@@ -54,6 +54,11 @@ export const api = {
         create: (data: unknown) => post<any>('/exercises', data),
         update: (id: string, data: unknown) => put<any>(`/exercises/${id}`, data),
         delete: (id: string)   => del<any>(`/exercises/${id}`),
+        notes: {
+            list:   (id: string)                    => get<any[]>(`/exercises/${id}/notes`),
+            create: (id: string, data: unknown)     => post<any>(`/exercises/${id}/notes`, data),
+            delete: (id: string, noteId: string)    => del<any>(`/exercises/${id}/notes/${noteId}`),
+        },
     },
 
     workouts: {
