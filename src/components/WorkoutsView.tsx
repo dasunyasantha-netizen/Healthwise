@@ -277,15 +277,15 @@ function SetLogger({ logId, sets, trackingType, exerciseName, prevSets }: {
                 </div>
             ))}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="btn btn-secondary btn-sm" onClick={addSet} disabled={saving}>
-                    <Plus size={13} /> Add Set
-                </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
                 {isTime && (
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowTimer(v => !v)}>
                         <Timer size={13} /> Timer
                     </button>
                 )}
+                <button className="btn btn-secondary btn-sm" onClick={addSet} disabled={saving}>
+                    <Plus size={13} /> Add Set
+                </button>
             </div>
 
             {showTimer && <ExerciseTimer onSave={saveTimer} />}
@@ -720,6 +720,7 @@ function ExerciseNotesModal({ exerciseId, exerciseName, onClose }: {
                     <div>
                         <h2 style={{ fontSize: '1rem', marginBottom: 2 }}>Notes</h2>
                         <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-3)' }}>{exerciseName}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-3)', fontFamily: 'monospace' }}>{exerciseId || '(no id)'}</div>
                     </div>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>
@@ -1318,7 +1319,7 @@ export default function WorkoutsView() {
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</span>
-                                                    <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
+                                                    <button className="btn btn-ghost btn-sm" style={{ padding: '3px 10px', fontSize: '0.72rem', height: 'auto', color: 'var(--color-primary)', border: '1.5px solid var(--color-primary)', borderRadius: 20, fontWeight: 600 }}
                                                         onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}>
                                                         Notes
                                                     </button>
