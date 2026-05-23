@@ -1183,60 +1183,52 @@ export default function WorkoutsView() {
                         </div>
                     )}
 
-                    {/* Completed sessions */}
-                    {sessions.filter(s => s.status === 'completed').map(s => {
-                        const expanded = expandedSessionId === s.id;
-                        return (
-                            <div key={s.id} className="card" style={{ marginBottom: 10 }}>
-                                {/* Header row — tap to expand */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-                                    onClick={() => setExpandedSessionId(expanded ? null : s.id)}>
-                                    <div className="exercise-icon"><Dumbbell size={18} /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 700 }}>{s.workoutPlan?.name || 'Workout'}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                            {s.exerciseLogs.length} exercises
-                                        </div>
+                    {/* Completed sessions — always expanded with full set logger since they're today's */}
+                    {sessions.filter(s => s.status === 'completed').map(s => (
+                        <div key={s.id} className="card" style={{ marginBottom: 16, border: '1.5px solid var(--color-border)' }}>
+                            {/* Header */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                                <div className="exercise-icon"><Dumbbell size={18} /></div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.workoutPlan?.name || 'Workout'}</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                        {s.exerciseLogs.length} exercises
                                     </div>
-                                    <span className="badge badge-green" style={{ marginRight: 4 }}><CheckCircle2 size={12} /> Done</span>
-                                    <ChevronDown size={16} color="var(--color-text-3)"
-                                        style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
                                 </div>
-
-                                {/* Expanded: exercise list + delete */}
-                                {expanded && (
-                                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border-light)' }}>
-                                        {s.exerciseLogs.map((log: any) => (
-                                            <div key={log.id} style={{ marginBottom: 12 }}>
-                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{log.exercise?.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)', marginBottom: 4 }}>
-                                                    {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
-                                                </div>
-                                                {log.sets?.length > 0 && (
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                        {log.sets.map((set: any, i: number) => (
-                                                            <span key={set.id} className="badge badge-gray">
-                                                                Set {i + 1}: {set.timeSeconds ? `${set.timeSeconds}s` : `${set.weight ?? '–'}kg × ${set.reps ?? '–'}`}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-danger, #ef4444)', marginTop: 4 }}
-                                            onClick={async () => {
-                                                if (!confirm('Delete this workout session?')) return;
-                                                await api.workouts.sessions.delete(s.id);
-                                                setSessions(prev => prev.filter(x => x.id !== s.id));
-                                                setExpandedSessionId(null);
-                                            }}>
-                                            <Trash2 size={14} /> Delete session
-                                        </button>
-                                    </div>
-                                )}
+                                <span className="badge badge-green"><CheckCircle2 size={12} /> Done</span>
+                                <button className="btn btn-ghost btn-icon" style={{ padding: 4, color: '#ef4444' }}
+                                    onClick={async () => {
+                                        if (!confirm('Delete this workout session?')) return;
+                                        await api.workouts.sessions.delete(s.id);
+                                        setSessions(prev => prev.filter(x => x.id !== s.id));
+                                    }}>
+                                    <Trash2 size={15} />
+                                </button>
                             </div>
-                        );
-                    })}
+
+                            {/* Exercises with editable sets */}
+                            {s.exerciseLogs.map((log: any) => (
+                                <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                                {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
+                                            </div>
+                                        </div>
+                                        <CheckCircle2 size={18} color="var(--color-primary)" />
+                                    </div>
+                                    <SetLogger
+                                        logId={log.id}
+                                        sets={log.sets ?? []}
+                                        trackingType={log.exercise?.trackingType ?? 'reps_weight'}
+                                        exerciseName={log.exercise?.name ?? ''}
+                                        prevSets={[]}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    ))}
 
                     {!activeSession && sessions.filter(s => s.status === 'completed').length === 0 && (
                         <div className="empty-state">
