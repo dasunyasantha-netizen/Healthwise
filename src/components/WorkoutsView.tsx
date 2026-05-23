@@ -660,6 +660,9 @@ export default function WorkoutsView() {
     const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
     const [search, setSearch] = useState('');
     const [catFilter, setCatFilter] = useState('');
+    const [showLibraryNewEx, setShowLibraryNewEx] = useState(false);
+    const [libNewEx, setLibNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight', primaryMuscle: 'Chest' });
+    const [libCreating, setLibCreating] = useState(false);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const load = async () => {
@@ -676,6 +679,26 @@ export default function WorkoutsView() {
     };
 
     useEffect(() => { load(); }, []);
+
+    const createLibraryExercise = async () => {
+        if (!libNewEx.name.trim()) return;
+        setLibCreating(true);
+        try {
+            await api.exercises.create({
+                name: libNewEx.name.trim(),
+                category: libNewEx.category,
+                trackingType: libNewEx.trackingType,
+                equipment: libNewEx.equipment,
+                primaryMuscle: libNewEx.primaryMuscle,
+                secondaryMuscles: [],
+                bodyPartFocus: libNewEx.primaryMuscle,
+                isSystem: false,
+            });
+            await load();
+            setShowLibraryNewEx(false);
+            setLibNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest' });
+        } catch {} finally { setLibCreating(false); }
+    };
 
     const startSession = async (plan: WorkoutPlan) => {
         try {
@@ -814,11 +837,53 @@ export default function WorkoutsView() {
 
             {tab === 'library' && (
                 <div>
-                    <div style={{ position: 'relative', marginBottom: 10 }}>
-                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
-                        <input className="input" placeholder="Search exercises..." value={search}
-                            onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
+                            <input className="input" placeholder="Search exercises..." value={search}
+                                onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+                        </div>
+                        <button className="btn btn-primary btn-sm" style={{ flexShrink: 0 }}
+                            onClick={() => setShowLibraryNewEx(v => !v)}>
+                            <Plus size={14} /> New
+                        </button>
                     </div>
+
+                    {showLibraryNewEx && (
+                        <div className="card" style={{ marginBottom: 12, border: '1.5px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-primary)' }}>New Exercise</div>
+                            <input className="input" placeholder="Exercise name" value={libNewEx.name}
+                                onChange={e => setLibNewEx(n => ({ ...n, name: e.target.value }))}
+                                onKeyDown={e => e.key === 'Enter' && createLibraryExercise()} autoFocus />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                <CustomSelect label="Category" value={libNewEx.category}
+                                    options={['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => ({ value: c, label: c }))}
+                                    onChange={v => setLibNewEx(n => ({ ...n, category: v }))} />
+                                <CustomSelect label="Muscle Target" value={libNewEx.primaryMuscle}
+                                    options={['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves','Full Body'].map(m => ({ value: m, label: m }))}
+                                    onChange={v => setLibNewEx(n => ({ ...n, primaryMuscle: v }))} />
+                                <CustomSelect label="Tracking" value={libNewEx.trackingType}
+                                    options={[
+                                        { value: 'reps_weight', label: 'Reps + Weight' },
+                                        { value: 'reps_only',   label: 'Reps only' },
+                                        { value: 'time',        label: 'Time' },
+                                        { value: 'distance',    label: 'Distance' },
+                                    ]}
+                                    onChange={v => setLibNewEx(n => ({ ...n, trackingType: v as Exercise['trackingType'] }))} />
+                                <CustomSelect label="Equipment" value={libNewEx.equipment}
+                                    options={['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => ({ value: eq, label: eq }))}
+                                    onChange={v => setLibNewEx(n => ({ ...n, equipment: v }))} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-ghost btn-sm" onClick={() => setShowLibraryNewEx(false)}>Cancel</button>
+                                <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                    onClick={createLibraryExercise} disabled={libCreating || !libNewEx.name.trim()}>
+                                    {libCreating ? 'Saving...' : 'Save Exercise'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
                         <button onClick={() => setCatFilter('')}
                             className={`badge ${!catFilter ? 'badge-green' : 'badge-gray'}`} style={{ cursor: 'pointer', border: 'none' }}>
