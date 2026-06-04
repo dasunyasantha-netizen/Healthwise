@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
             react(),
             VitePWA({
                 registerType: 'autoUpdate',
+                strategies: 'injectManifest',
+                srcDir: 'public',
+                filename: 'sw.js',
                 includeAssets: ['icon-192.svg'],
                 manifest: {
                     name: 'HealthWise',
@@ -43,22 +46,8 @@ export default defineConfig(({ mode }) => {
                         },
                     ],
                 },
-                workbox: {
-                    skipWaiting: true,
-                    clientsClaim: true,
+                injectManifest: {
                     globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-                    runtimeCaching: [
-                        {
-                            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-                            handler: 'CacheFirst',
-                            options: { cacheName: 'google-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-                        },
-                        {
-                            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-                            handler: 'CacheFirst',
-                            options: { cacheName: 'gstatic-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-                        },
-                    ],
                 },
             }),
         ],
