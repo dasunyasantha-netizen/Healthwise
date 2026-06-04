@@ -43,24 +43,25 @@ export const getLatestMeasurement = async (req: AuthRequest, res: Response) => {
 
 export const createMeasurement = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
-    const data = { ...req.body };
+    const { height, ...rest } = req.body;
+    const data: any = { ...rest };
 
     // Auto-calculate BMI if weight and height are available
     if (data.weight && !data.bmi) {
         const settings = await prisma.settings.findUnique({ where: { userId } });
-        const height = data.height || settings?.height;
-        if (height) {
-            const heightM = height / 100;
+        const heightCm = height || settings?.height;
+        if (heightCm) {
+            const heightM = heightCm / 100;
             data.bmi = parseFloat((data.weight / (heightM * heightM)).toFixed(1));
         }
     }
 
     // Store height on settings if provided
-    if (data.height) {
+    if (height) {
         await prisma.settings.upsert({
             where: { userId },
-            update: { height: data.height },
-            create: { userId, height: data.height },
+            update: { height },
+            create: { userId, height },
         });
     }
 
@@ -74,7 +75,15 @@ export const updateMeasurement = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
     const existing = await prisma.healthMeasurement.findFirst({ where: { id: req.params.id, userId } });
     if (!existing) { res.status(404).json({ error: 'Measurement not found' }); return; }
-    const measurement = await prisma.healthMeasurement.update({ where: { id: req.params.id }, data: req.body });
+    const { height, ...rest } = req.body;
+    if (height) {
+        await prisma.settings.upsert({
+            where: { userId },
+            update: { height },
+            create: { userId, height },
+        });
+    }
+    const measurement = await prisma.healthMeasurement.update({ where: { id: req.params.id }, data: rest });
     res.json(measurement);
 };
 

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp } from 'lucide-react';
+import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp, Link } from 'lucide-react';
 import { format, startOfWeek, parseISO, addDays, isSameDay } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
+import { DatePicker } from './DatePicker';
 
 type Tab = 'today' | 'plans' | 'library' | 'analytics';
 
@@ -190,9 +191,9 @@ function ExerciseTimer({ onSave }: { onSave: (seconds: number) => void }) {
 
 // ─── SET LOGGER ──────────────────────────────────────────────────────────────
 
-function SetLogger({ logId, sets, trackingType, exerciseName, prevSets }: {
+function SetLogger({ logId, sets, trackingType, exerciseName, prevSets, onNotes }: {
     logId: string; sets: any[]; trackingType: string;
-    exerciseName: string; prevSets: any[];
+    exerciseName: string; prevSets: any[]; onNotes?: () => void;
 }) {
     const [localSets, setLocalSets] = useState(sets);
     const [saving, setSaving] = useState(false);
@@ -277,7 +278,13 @@ function SetLogger({ logId, sets, trackingType, exerciseName, prevSets }: {
                 </div>
             ))}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                {onNotes && (
+                    <button className="btn btn-secondary btn-sm" onClick={onNotes}>
+                        Notes
+                    </button>
+                )}
+                <div style={{ flex: 1 }} />
                 {isTime && (
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowTimer(v => !v)}>
                         <Timer size={13} /> Timer
@@ -382,6 +389,7 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
         trackingType: 'reps_weight' as Exercise['trackingType'],
         equipment: 'Bodyweight',
         primaryMuscle: 'Chest',
+        demoVideoUrl: '',
     });
     const [creatingEx, setCreatingEx] = useState(false);
     const [muscleFilter, setMuscleFilter] = useState('');
@@ -441,12 +449,13 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                 primaryMuscle: newEx.primaryMuscle,
                 secondaryMuscles: [],
                 bodyPartFocus: newEx.primaryMuscle,
+                demoVideoUrl: newEx.demoVideoUrl.trim() || null,
                 isSystem: false,
             });
             setExercises(prev => [...prev, created]);
             addExercise(created);
             setShowNewEx(false);
-            setNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest' });
+            setNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest', demoVideoUrl: '' });
             setSearch('');
         } catch {} finally { setCreatingEx(false); }
     };
@@ -499,7 +508,7 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                         {!isTemplate && (
                             <div className="form-group">
                                 <label className="label">Workout Date</label>
-                                <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                                <DatePicker value={date} onChange={v => v && setDate(v)} />
                             </div>
                         )}
                         <button className="btn btn-primary w-full" style={{ justifyContent: 'center', marginTop: 8 }}
@@ -592,6 +601,13 @@ function WorkoutPlanBuilder({ onClose, onSaved, editing }: { onClose: () => void
                                     <CustomSelect label="Equipment" value={newEx.equipment}
                                         options={['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => ({ value: eq, label: eq }))}
                                         onChange={v => setNewEx(n => ({ ...n, equipment: v }))} />
+                                </div>
+
+                                <div style={{ position: 'relative' }}>
+                                    <Link size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)', pointerEvents: 'none' }} />
+                                    <input className="input" placeholder="Demo video URL (optional)" value={newEx.demoVideoUrl}
+                                        onChange={e => setNewEx(n => ({ ...n, demoVideoUrl: e.target.value }))}
+                                        style={{ paddingLeft: 34 }} />
                                 </div>
 
                                 <div style={{ display: 'flex', gap: 8 }}>
@@ -773,6 +789,7 @@ function SessionRunner({ session, onClose, onComplete }: {
 }) {
     const [current, setCurrent] = useState(session);
     const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
+    const [notesModal, setNotesModal] = useState<{ exerciseId: string; exerciseName: string } | null>(null);
 
     useEffect(() => {
         // Load previous sets for each exercise
@@ -843,10 +860,12 @@ function SessionRunner({ session, onClose, onComplete }: {
                             trackingType={log.exercise.trackingType}
                             exerciseName={log.exercise.name}
                             prevSets={prevSetsMap[log.exerciseId] || []}
+                            onNotes={() => setNotesModal({ exerciseId: log.exerciseId, exerciseName: log.exercise.name })}
                         />
                     </div>
                 ))}
             </div>
+            {notesModal && <ExerciseNotesModal exerciseId={notesModal.exerciseId} exerciseName={notesModal.exerciseName} onClose={() => setNotesModal(null)} />}
         </div>
     );
 }
@@ -1125,43 +1144,62 @@ function DayStrip({ selectedDate, onSelect }: { selectedDate: string; onSelect: 
         }
     }, [selectedDate]);
 
+    const btnBase: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+        fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--font)',
+        transition: 'all .15s', border: '1.5px solid var(--color-border)',
+        background: 'var(--color-surface)', color: 'var(--color-text-2)',
+    };
+
     return (
-        <div ref={stripRef} style={{ display: 'flex', overflowX: 'auto', gap: 8, paddingBottom: 12, marginBottom: 8, scrollbarWidth: 'none' }}>
-            {dates.map(dateObj => {
-                const d = format(dateObj, 'yyyy-MM-dd');
-                const isSelected = d === selectedDate;
-                const isToday = d === todayStr;
+        <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <button
+                    onClick={() => onSelect(todayStr)}
+                    style={{ ...btnBase, ...(selectedDate === todayStr ? { background: '#0073ea', color: '#fff', border: '1.5px solid #0073ea' } : {}) }}
+                >
+                    Today
+                </button>
+                <DatePicker value={selectedDate} onChange={v => v && onSelect(v)} iconOnly />
+            </div>
+            <div ref={stripRef} style={{ display: 'flex', overflowX: 'auto', overflowY: 'visible', gap: 6, paddingTop: 5, paddingBottom: 10, scrollbarWidth: 'none' }}>
+                {dates.map(dateObj => {
+                    const d = format(dateObj, 'yyyy-MM-dd');
+                    const isSelected = d === selectedDate;
+                    const isToday = d === todayStr;
 
-                let bg = 'var(--color-surface-2)';
-                let color = 'var(--color-text-3)';
-                let border = '1.5px solid transparent';
-                let shadow = 'none';
-                let transform = 'none';
+                    let bg = 'var(--color-surface-2)';
+                    let color = 'var(--color-text-3)';
+                    let border = '1px solid var(--color-border)';
+                    let shadow = 'none';
+                    let transform = 'none';
 
-                if (isSelected && isToday) {
-                    bg = '#0073ea'; color = '#fff'; shadow = '0 4px 12px rgba(0,115,234,0.35)'; transform = 'scale(1.08)';
-                } else if (isSelected) {
-                    bg = 'var(--color-text)'; color = 'var(--color-surface)'; shadow = '0 4px 12px rgba(0,0,0,0.15)'; transform = 'scale(1.08)';
-                } else if (isToday) {
-                    bg = 'var(--color-surface)'; color = 'var(--color-text-2)'; border = '2px solid #0073ea';
-                }
+                    if (isSelected && isToday) {
+                        bg = '#0073ea'; color = '#fff'; border = '1px solid #0073ea'; shadow = '0 3px 10px rgba(0,115,234,0.35)'; transform = 'scale(1.08)';
+                    } else if (isSelected) {
+                        bg = 'var(--color-text)'; color = 'var(--color-surface)'; border = '1px solid var(--color-text)'; shadow = '0 3px 10px rgba(0,0,0,0.15)'; transform = 'scale(1.08)';
+                    } else if (isToday) {
+                        bg = 'var(--color-surface)'; color = '#0073ea'; border = '2px solid #0073ea';
+                    }
 
-                return (
-                    <button key={d} data-date={d} onClick={() => onSelect(d)} style={{
-                        flexShrink: 0, width: 48, height: 64,
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
-                        borderRadius: 14, border, background: bg, color, cursor: 'pointer',
-                        boxShadow: shadow, transform, transition: 'all .15s', fontFamily: 'var(--font)',
-                    }}>
-                        <span style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', opacity: 0.75 }}>
-                            {format(dateObj, 'EEE')}
-                        </span>
-                        <span style={{ fontSize: '1.125rem', fontWeight: 800, lineHeight: 1 }}>
-                            {format(dateObj, 'd')}
-                        </span>
-                    </button>
-                );
-            })}
+                    return (
+                        <button key={d} data-date={d} onClick={() => onSelect(d)} style={{
+                            flexShrink: 0, width: 42, height: 54,
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                            borderRadius: 12, border, background: bg, color, cursor: 'pointer',
+                            boxShadow: shadow, transform, transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}>
+                            <span style={{ fontSize: '0.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', opacity: 0.75 }}>
+                                {format(dateObj, 'EEE')}
+                            </span>
+                            <span style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1 }}>
+                                {format(dateObj, 'd')}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -1180,7 +1218,7 @@ export default function WorkoutsView() {
     const [search, setSearch] = useState('');
     const [catFilter, setCatFilter] = useState('');
     const [showLibraryNewEx, setShowLibraryNewEx] = useState(false);
-    const [libNewEx, setLibNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight', primaryMuscle: 'Chest' });
+    const [libNewEx, setLibNewEx] = useState({ name: '', category: 'Strength', trackingType: 'reps_weight' as Exercise['trackingType'], equipment: 'Bodyweight', primaryMuscle: 'Chest', demoVideoUrl: '' });
     const [libCreating, setLibCreating] = useState(false);
     const [prevSetsMap, setPrevSetsMap] = useState<Record<string, any[]>>({});
     const [finishing, setFinishing] = useState(false);
@@ -1247,11 +1285,12 @@ export default function WorkoutsView() {
                 primaryMuscle: libNewEx.primaryMuscle,
                 secondaryMuscles: [],
                 bodyPartFocus: libNewEx.primaryMuscle,
+                demoVideoUrl: libNewEx.demoVideoUrl.trim() || null,
                 isSystem: false,
             });
             await load();
             setShowLibraryNewEx(false);
-            setLibNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest' });
+            setLibNewEx({ name: '', category: 'Strength', trackingType: 'reps_weight', equipment: 'Bodyweight', primaryMuscle: 'Chest', demoVideoUrl: '' });
         } catch {} finally { setLibCreating(false); }
     };
 
@@ -1322,13 +1361,7 @@ export default function WorkoutsView() {
                                 <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</span>
-                                                <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', height: 'auto', color: 'var(--color-text-3)', border: '1px solid var(--color-border)' }}
-                                                    onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise.name })}>
-                                                    Notes
-                                                </button>
-                                            </div>
+                                            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
                                                 {getMajorGroup(log.exercise.primaryMuscle ?? '')} · {log.exercise.trackingType === 'time' ? 'Time-based' : log.exercise.trackingType === 'reps_only' ? 'Reps only' : 'Reps + Weight'}
                                             </div>
@@ -1346,6 +1379,7 @@ export default function WorkoutsView() {
                                         trackingType={log.exercise.trackingType}
                                         exerciseName={log.exercise.name}
                                         prevSets={prevSetsMap[log.exerciseId] || []}
+                                        onNotes={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise.name })}
                                     />
                                 </div>
                             ))}
@@ -1390,13 +1424,7 @@ export default function WorkoutsView() {
                                     <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</span>
-                                                    <button className="btn btn-ghost btn-sm" style={{ padding: '3px 10px', fontSize: '0.72rem', height: 'auto', color: 'var(--color-primary)', border: '1.5px solid var(--color-primary)', borderRadius: 20, fontWeight: 600 }}
-                                                        onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}>
-                                                        Notes
-                                                    </button>
-                                                </div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
                                                     {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
                                                 </div>
@@ -1409,6 +1437,7 @@ export default function WorkoutsView() {
                                             trackingType={log.exercise?.trackingType ?? 'reps_weight'}
                                             exerciseName={log.exercise?.name ?? ''}
                                             prevSets={[]}
+                                            onNotes={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}
                                         />
                                     </div>
                                 ))}
@@ -1511,6 +1540,14 @@ export default function WorkoutsView() {
                                     options={['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => ({ value: eq, label: eq }))}
                                     onChange={v => setLibNewEx(n => ({ ...n, equipment: v }))} />
                             </div>
+
+                            <div style={{ position: 'relative' }}>
+                                <Link size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)', pointerEvents: 'none' }} />
+                                <input className="input" placeholder="Demo video URL (optional)" value={libNewEx.demoVideoUrl}
+                                    onChange={e => setLibNewEx(n => ({ ...n, demoVideoUrl: e.target.value }))}
+                                    style={{ paddingLeft: 34 }} />
+                            </div>
+
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <button className="btn btn-ghost btn-sm" onClick={() => setShowLibraryNewEx(false)}>Cancel</button>
                                 <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}

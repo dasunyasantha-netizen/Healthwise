@@ -72,3 +72,13 @@ export const cancelFasting = async (req: AuthRequest, res: Response) => {
     });
     res.json(session);
 };
+
+export const deleteFasting = async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const existing = await prisma.fastingSession.findFirst({
+        where: { id: req.params.id, userId }
+    });
+    if (!existing) { res.status(404).json({ error: 'Fasting session not found' }); return; }
+    await prisma.fastingSession.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+};

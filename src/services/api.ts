@@ -104,6 +104,7 @@ export const api = {
         start:  (data: unknown) => post<any>('/fasting/start', data),
         end:    (id: string)    => post<any>(`/fasting/${id}/end`, {}),
         cancel: (id: string)    => post<any>(`/fasting/${id}/cancel`, {}),
+        delete: (id: string)    => del<any>(`/fasting/${id}`),
     },
 
     habits: {

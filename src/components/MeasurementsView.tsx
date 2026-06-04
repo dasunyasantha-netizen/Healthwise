@@ -3,6 +3,7 @@ import { Plus, X, Ruler, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, 
 import { format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../services/api';
+import { DatePicker } from './DatePicker';
 import { HealthMeasurement } from '../types';
 
 type Tab = 'latest' | 'form' | 'charts';
@@ -77,8 +78,7 @@ function MeasurementForm({ onClose, onSaved, editing }: { onClose: () => void; o
 
                 <div className="form-group" style={{ marginBottom: 16 }}>
                     <label className="label">Date</label>
-                    <input className="input" type="date" value={form.date}
-                        onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                    <DatePicker value={form.date} onChange={v => setForm(f => ({ ...f, date: v || format(new Date(), 'yyyy-MM-dd') }))} />
                 </div>
 
                 <div className="section-title">Body Metrics</div>
