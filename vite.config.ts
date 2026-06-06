@@ -17,9 +17,7 @@ export default defineConfig(({ mode }) => {
             react(),
             VitePWA({
                 registerType: 'autoUpdate',
-                strategies: 'injectManifest',
-                srcDir: 'public',
-                filename: 'sw.js',
+                strategies: 'generateSW',
                 includeAssets: ['icon-192.svg'],
                 manifest: {
                     name: 'HealthWise',
@@ -46,8 +44,11 @@ export default defineConfig(({ mode }) => {
                         },
                     ],
                 },
-                injectManifest: {
+                workbox: {
                     globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+                    cleanupOutdatedCaches: true,
+                    clientsClaim: true,
+                    skipWaiting: true,
                 },
             }),
         ],
