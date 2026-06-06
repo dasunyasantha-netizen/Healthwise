@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { VersionBanner } from './components/VersionBanner';
 import { api } from './services/api';
 import { ViewMode, User, DashboardData } from './types';
 import BottomNav from './components/BottomNav';
@@ -126,6 +127,7 @@ export default function App() {
     }
 
     return (
+        <>
         <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
             <Header user={user} onLogout={logout} />
             <main style={{ flex: 1 }}>
@@ -138,5 +140,7 @@ export default function App() {
             </main>
             <BottomNav current={view} onChange={handleViewChange} />
         </div>
+        <VersionBanner />
+        </>
     );
 }

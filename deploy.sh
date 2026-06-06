@@ -39,9 +39,11 @@ npm install --silent
 cd server && npm install --silent && npm run build
 cd ..
 CACHE_VERSION=$(git rev-parse --short HEAD)
+CURRENT_SHA=$(git rev-parse HEAD)
 sed -i "s/__CACHE_VERSION__/$CACHE_VERSION/g" public/sw.js
-echo "[remote] Building frontend..."
-npm run build
+echo "{\"sha\":\"$CURRENT_SHA\"}" > public/version.json
+echo "[remote] Building frontend with VITE_BUILD_SHA=$CURRENT_SHA..."
+VITE_BUILD_SHA=$CURRENT_SHA npm run build
 git checkout public/sw.js
 echo "[remote] Restarting backend..."
 pm2 restart healthwise-backend
