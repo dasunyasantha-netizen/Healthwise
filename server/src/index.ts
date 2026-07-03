@@ -14,12 +14,14 @@ import habitRoutes from './routes/habitRoutes';
 import measurementRoutes from './routes/measurementRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import { blockReadOnlyPreviewWrites } from './middleware/authMiddleware';
 
 const app = express();
 const PORT = process.env.PORT || 4500;
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(blockReadOnlyPreviewWrites);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
