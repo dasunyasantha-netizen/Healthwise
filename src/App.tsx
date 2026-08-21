@@ -11,8 +11,10 @@ import HabitsView from './components/HabitsView';
 import MeasurementsView from './components/MeasurementsView';
 import CalendarView from './components/CalendarView';
 import AuthScreen from './components/AuthScreen';
+import { captureLaunchSource, type LaunchSource } from './services/launchSource';
 
 export default function App() {
+    const [launchSource] = useState<LaunchSource>(() => captureLaunchSource());
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [view, setView] = useState<ViewMode>('dashboard');
@@ -129,7 +131,7 @@ export default function App() {
     return (
         <>
         <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
-            <Header user={user} onLogout={logout} />
+            <Header user={user} onLogout={logout} launchSource={launchSource} />
             <main style={{ flex: 1 }}>
                 {view === 'dashboard'    && <Dashboard data={dashboard} loading={dashLoading} onRefresh={loadDashboard} onNavigate={handleViewChange} />}
                 {view === 'workouts'     && <WorkoutsView />}

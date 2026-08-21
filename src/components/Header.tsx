@@ -1,16 +1,12 @@
 import { Activity, LogOut, Home } from 'lucide-react';
 import { User } from '../types';
+import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource';
 
 interface Props {
     user: User;
     onLogout: () => void;
+    launchSource: LaunchSource;
 }
-
-const getSyswiseUrl = () => {
-    if (typeof window === 'undefined') return 'https://syswise.lk';
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return isLocal ? 'http://localhost:3100' : 'https://syswise.lk';
-};
 
 function Avatar({ user }: { user: User }) {
     const initials = user.name
@@ -47,7 +43,7 @@ function Avatar({ user }: { user: User }) {
     );
 }
 
-export default function Header({ user, onLogout }: Props) {
+export default function Header({ user, onLogout, launchSource }: Props) {
     return (
         <header className="app-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -69,7 +65,7 @@ export default function Header({ user, onLogout }: Props) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Avatar user={user} />
-                <a href={getSyswiseUrl()} className="btn btn-ghost btn-icon" title="Back to SysWise">
+                <a href={launcherHomeUrl(launchSource)} className="btn btn-ghost btn-icon" title={`Back to ${launcherName(launchSource)}`} aria-label={`Back to ${launcherName(launchSource)}`}>
                     <Home size={18} />
                 </a>
                 <button className="btn btn-ghost btn-icon" onClick={onLogout} title="Sign out">
