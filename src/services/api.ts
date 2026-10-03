@@ -1,3 +1,5 @@
+import { requireSharedSignIn } from './sharedAuth';
+
 const getBaseUrl = () => {
     if (typeof window === 'undefined') return '';
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -17,6 +19,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         body: body ? JSON.stringify(body) : undefined
     });
 
+    if (res.status === 401 && token) requireSharedSignIn();
     if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || `HTTP ${res.status}`);

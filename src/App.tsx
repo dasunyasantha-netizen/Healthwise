@@ -11,9 +11,11 @@ import HabitsView from './components/HabitsView';
 import MeasurementsView from './components/MeasurementsView';
 import CalendarView from './components/CalendarView';
 import AuthScreen from './components/AuthScreen';
+import { signOut, watchSharedSignOut } from './services/sharedAuth';
 import { captureLaunchSource, type LaunchSource } from './services/launchSource';
 
 export default function App() {
+    useEffect(() => watchSharedSignOut(), []);
     const [launchSource] = useState<LaunchSource>(() => captureLaunchSource());
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export default function App() {
         setToken(null);
         setUser(null);
         setDashboard(null);
+        signOut();
     };
 
     const handleViewChange = (v: ViewMode) => {
