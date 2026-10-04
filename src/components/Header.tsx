@@ -1,6 +1,6 @@
-import { Activity, LogOut, Home } from 'lucide-react';
+import { Activity, LogOut } from 'lucide-react';
 import { User } from '../types';
-import { launcherHomeUrl, launcherName, type LaunchSource } from '../services/launchSource';
+import { launcherHomeUrl, type LaunchSource } from '../services/launchSource';
 
 interface Props {
     user: User;
@@ -43,7 +43,7 @@ function Avatar({ user }: { user: User }) {
     );
 }
 
-export default function Header({ user, onLogout, launchSource }: Props) {
+export default function Header({ user, onLogout }: Props) {
     return (
         <header className="app-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -65,8 +65,8 @@ export default function Header({ user, onLogout, launchSource }: Props) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Avatar user={user} />
-                <a href={launcherHomeUrl(launchSource)} className="btn btn-ghost btn-icon" title={`Back to ${launcherName(launchSource)}`} aria-label={`Back to ${launcherName(launchSource)}`}>
-                    <Home size={18} />
+                <a href={launcherHomeUrl('pickiti')} className="btn btn-ghost btn-icon" title="Back to Pickiti" aria-label="Back to Pickiti">
+                    <img src={`${import.meta.env.BASE_URL}pickiti-mark.png`} alt="" width={26} height={26} style={{ objectFit: 'contain' }} />
                 </a>
                 <button className="btn btn-ghost btn-icon" onClick={onLogout} title="Sign out">
                     <LogOut size={18} />
