@@ -10,7 +10,8 @@
         "db:push": "prisma db push",
         "db:migrate": "prisma migrate dev",
         "db:studio": "prisma studio",
-        "db:seed": "ts-node prisma/seed.ts"
+        "db:seed": "ts-node prisma/seed.ts",
+        "test:deletion": "ts-node tests/accountDeletion.test.ts"
     },
     "dependencies": {
         "@prisma/client": "^5.10.2",

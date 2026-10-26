@@ -14,6 +14,7 @@ import habitRoutes from './routes/habitRoutes';
 import measurementRoutes from './routes/measurementRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import syswiseRoutes from './routes/syswiseRoutes';
 import { blockReadOnlyPreviewWrites } from './middleware/authMiddleware';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/habits', habitRoutes);
 app.use('/api/measurements', measurementRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/syswise', syswiseRoutes);
 
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', app: 'healthwise', timestamp: new Date().toISOString() });

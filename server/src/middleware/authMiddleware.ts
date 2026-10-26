@@ -33,9 +33,14 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         return;
     }
 
-    // Always read fresh syswiseToken from DB — the one embedded in the JWT is stale after re-login
+    // Always read fresh syswiseToken from DB — the one embedded in the JWT is stale after re-login.
+    // Every SSO login writes this row; it is removed when the SysWise account is closed.
     const session = await prisma.session.findUnique({ where: { userId } });
-    req.user = { userId, syswiseToken: session?.syswiseToken ?? decoded.syswiseToken };
+    if (!session) {
+        res.sendStatus(403);
+        return;
+    }
+    req.user = { userId, syswiseToken: session.syswiseToken ?? decoded.syswiseToken };
     next();
 };
 
