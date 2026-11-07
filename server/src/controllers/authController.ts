@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
 import { SupportClaim, isSupportRefusal, verifySupportToken } from '../lib/supportAccess';
+import { isIdentityRefusal, verifySyswiseIdentity } from '../lib/syswiseIdentity';
 
 const SYSWISE_API = process.env.SYSWISE_API_URL || 'http://localhost:8000';
 
@@ -34,30 +35,21 @@ async function resolvePreviewTarget(ssoToken: string, previewUserId: unknown):
 }
 
 export const ssoLogin = async (req: Request, res: Response) => {
-    const { token, syswise_token, syswiseUserId, phone, email, name, previewUserId, supportToken } = req.body;
+    const { token, syswise_token, previewUserId, supportToken } = req.body;
     const ssoToken = token || syswise_token;
 
     try {
-        if (!ssoToken) {
-            res.status(400).json({ error: 'No token provided' });
+        // Who is signing in comes only from SysWise, never from the request body.
+        const identity = await verifySyswiseIdentity('healthwise', ssoToken);
+        if (isIdentityRefusal(identity)) {
+            res.status(identity.status).json({ error: identity.error });
             return;
         }
 
-        let userId = syswiseUserId ? parseInt(String(syswiseUserId), 10) : null;
-        if (!userId) {
-            const payload = JSON.parse(Buffer.from(ssoToken.split('.')[1], 'base64').toString());
-            userId = parseInt(String(payload.user_id || payload.id || '0'), 10) || null;
-        }
-
-        if (!userId || isNaN(userId)) {
-            res.status(400).json({ error: 'Could not determine SysWise user ID' });
-            return;
-        }
-
-        let effectiveUserId: number = userId;
-        let userName = name || 'SysWise User';
-        let userEmail = email || '';
-        let userPhone = phone || '';
+        let effectiveUserId: number = identity.id;
+        let userName = [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.username || 'SysWise User';
+        let userEmail = identity.email;
+        let userPhone = identity.phone;
         let previewMode = false;
         let saveChanges = false;
         let support: SupportClaim | undefined;
