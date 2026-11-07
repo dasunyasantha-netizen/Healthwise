@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
+import { SupportClaim, isSupportRefusal, verifySupportToken } from '../lib/supportAccess';
 
 const SYSWISE_API = process.env.SYSWISE_API_URL || 'http://localhost:8000';
 
@@ -33,7 +34,7 @@ async function resolvePreviewTarget(ssoToken: string, previewUserId: unknown):
 }
 
 export const ssoLogin = async (req: Request, res: Response) => {
-    const { token, syswise_token, syswiseUserId, phone, email, name, previewUserId, previewSaveChanges } = req.body;
+    const { token, syswise_token, syswiseUserId, phone, email, name, previewUserId, supportToken } = req.body;
     const ssoToken = token || syswise_token;
 
     try {
@@ -59,6 +60,8 @@ export const ssoLogin = async (req: Request, res: Response) => {
         let userPhone = phone || '';
         let previewMode = false;
         let saveChanges = false;
+        let support: SupportClaim | undefined;
+        let expiresIn = 24 * 60 * 60;
 
         if (previewUserId) {
             const { target, error } = await resolvePreviewTarget(ssoToken, previewUserId);
@@ -66,12 +69,20 @@ export const ssoLogin = async (req: Request, res: Response) => {
                 res.status(error.status).json({ error: error.message });
                 return;
             }
+            // Only through a running SysWise Support Access session for this customer.
+            const session = await verifySupportToken('healthwise', supportToken, Number(target.id));
+            if (isSupportRefusal(session)) {
+                res.status(session.status).json({ error: session.error });
+                return;
+            }
+            support = session.claim;
+            expiresIn = Math.min(expiresIn, session.expiresIn);
             effectiveUserId = target.id;
             userName = [target.first_name, target.last_name].filter(Boolean).join(' ') || target.username || 'SysWise User';
             userEmail = target.email || '';
             userPhone = target.phone || '';
             previewMode = true;
-            saveChanges = Boolean(previewSaveChanges);
+            saveChanges = session.allowChanges;
         }
 
         // In preview mode the session cache is NOT touched — writing the superuser's
@@ -85,9 +96,9 @@ export const ssoLogin = async (req: Request, res: Response) => {
         }
 
         const hwToken = jwt.sign(
-            { userId: effectiveUserId, previewMode, previewSaveChanges: saveChanges, syswiseToken: ssoToken },
+            { userId: effectiveUserId, previewMode, previewSaveChanges: saveChanges, syswiseToken: ssoToken, support },
             process.env.JWT_SECRET as string,
-            { expiresIn: '24h' }
+            { expiresIn }
         );
 
         res.json({

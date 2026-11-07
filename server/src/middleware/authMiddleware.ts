@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../prisma';
+import { guardSupportRequest } from '../lib/supportAccess';
 
 export interface AuthRequest extends Request {
     user?: { userId: number; syswiseToken?: string };
@@ -44,11 +45,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     next();
 };
 
-// Blocks mutating requests made with a read-only preview token (SysWise superuser
-// "view as" with Save changes off). Decodes the bearer token itself so it can be
-// mounted app-wide ahead of the per-route auth middleware.
+// Preview tokens (SysWise Support Access): the session must still be running, and
+// writes are refused unless it allows changes. Decodes the bearer token itself so it
+// can be mounted app-wide ahead of the per-route auth middleware.
 export const blockReadOnlyPreviewWrites = (req: Request, res: Response, next: NextFunction) => {
-    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    if (req.method === 'OPTIONS') {
         next();
         return;
     }
@@ -61,8 +62,12 @@ export const blockReadOnlyPreviewWrites = (req: Request, res: Response, next: Ne
 
     try {
         const payload = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-        if (payload.previewMode && !payload.previewSaveChanges) {
-            res.status(403).json({ error: 'Preview is read-only. Enable "Save changes" to modify this account.' });
+        if (payload.previewMode) {
+            if (req.method !== 'GET' && req.method !== 'HEAD' && !payload.previewSaveChanges) {
+                res.status(403).json({ error: 'Preview is read-only. Enable "Save changes" to modify this account.' });
+                return;
+            }
+            void guardSupportRequest('healthwise', payload.support, req, res, next);
             return;
         }
     } catch { /* invalid token — the route's own auth will reject it */ }
