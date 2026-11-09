@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../services/api';
 import { DatePicker } from './DatePicker';
+import { confirmDialog } from './ConfirmDialog';
 import { HealthMeasurement } from '../types';
 
 type Tab = 'latest' | 'form' | 'charts';
@@ -303,7 +304,7 @@ export default function MeasurementsView() {
                                                 <Pencil size={14} color="var(--color-text-3)" />
                                             </button>
                                             <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
-                                                onClick={async () => { if (confirm('Delete?')) { await api.measurements.delete(m.id); load(); } }}>
+                                                onClick={async () => { if (await confirmDialog({ title: 'Delete this measurement?', message: "This can't be undone.", confirmLabel: 'Delete', tone: 'danger', icon: <Trash2 size={22} /> })) { await api.measurements.delete(m.id); load(); } }}>
                                                 <Trash2 size={14} color="var(--color-text-3)" />
                                             </button>
                                         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, X, Flame, CheckCircle2, Trophy, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { api } from '../services/api';
+import { confirmDialog } from './ConfirmDialog';
 import { Habit, HabitWithCompletion, HabitStats } from '../types';
 
 const MILESTONE_BADGES: Record<number, { label: string; color: string }> = {
@@ -345,7 +346,7 @@ export default function HabitsView() {
                                 </button>
                                 <button className="btn btn-ghost btn-icon" style={{ padding: 4 }}
                                     onClick={async () => {
-                                        if (confirm('Delete this habit?')) {
+                                        if (await confirmDialog({ title: 'Delete this habit?', message: "This can't be undone.", confirmLabel: 'Delete', tone: 'danger', icon: <Trash2 size={22} /> })) {
                                             await api.habits.delete(h.id);
                                             load();
                                         }

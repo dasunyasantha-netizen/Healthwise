@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp, Link } from 'lucide-react';
+import { Plus, Dumbbell, Search, ChevronRight, X, Play, CheckCircle2, ExternalLink, Trash2, Timer, RotateCcw, Pencil, ChevronDown, BarChart2, TrendingUp, Link, AlertTriangle } from 'lucide-react';
 import { format, startOfWeek, parseISO, addDays, isSameDay } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 import { Exercise, WorkoutPlan, WorkoutSession } from '../types';
 import { DatePicker } from './DatePicker';
+import { confirmDialog, notifyDialog } from './ConfirmDialog';
 
 type Tab = 'today' | 'plans' | 'library' | 'analytics';
 
@@ -1447,14 +1448,14 @@ export default function WorkoutsView() {
                 if (prev) setPrevSetsMap(m => ({ ...m, [ex.id]: prev.sets || [] }));
             }).catch(() => {});
         } catch {
-            alert('Could not add the exercise. Please try again.');
+            notifyDialog({ title: "Couldn't add exercise", message: 'Please check your connection and try again.', icon: <AlertTriangle size={22} /> });
         }
     };
 
     // Undo "Done": put a finished workout back in progress so it can be edited again
     const reopenSession = async (s: WorkoutSession) => {
         if (activeSession && activeSession.id !== s.id) {
-            alert('Finish the workout that is in progress before reopening another one.');
+            notifyDialog({ title: 'Another workout is in progress', message: 'Finish the workout that is in progress before reopening this one.', icon: <AlertTriangle size={22} /> });
             return;
         }
         setReopeningId(s.id);
@@ -1462,7 +1463,7 @@ export default function WorkoutsView() {
             await api.workouts.sessions.update(s.id, { status: 'in_progress', endedAt: null });
             applySessions(await api.workouts.sessions.byDate(s.date));
         } catch {
-            alert('Could not reopen this workout. Please try again.');
+            notifyDialog({ title: "Couldn't reopen workout", message: 'Please check your connection and try again.', icon: <AlertTriangle size={22} /> });
         } finally { setReopeningId(null); }
     };
 
@@ -1610,16 +1611,27 @@ export default function WorkoutsView() {
                                     <button className="badge badge-green" title="Tap to undo Done and keep editing"
                                         style={{ flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
                                         disabled={reopeningId === s.id}
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                             e.stopPropagation();
-                                            if (confirm('Undo "Done" and reopen this workout so you can add more exercises or sets?')) reopenSession(s);
+                                            const ok = await confirmDialog({
+                                                title: 'Reopen this workout?',
+                                                message: "It goes back to in progress so you can add more exercises or sets. Tap Finish again when you're done.",
+                                                confirmLabel: 'Reopen',
+                                                icon: <RotateCcw size={22} />,
+                                            });
+                                            if (ok) reopenSession(s);
                                         }}>
                                         <CheckCircle2 size={12} /> {reopeningId === s.id ? 'Reopening…' : 'Done'}
                                     </button>
                                     <button className="btn btn-ghost btn-icon" style={{ padding: 4, color: '#ef4444', flexShrink: 0 }}
                                         onClick={async (e) => {
                                             e.stopPropagation();
-                                            if (!confirm('Delete this workout session?')) return;
+                                            const ok = await confirmDialog({
+                                                title: 'Delete this workout?',
+                                                message: 'All exercises and sets logged in it will be removed.',
+                                                confirmLabel: 'Delete', tone: 'danger', icon: <Trash2 size={22} />,
+                                            });
+                                            if (!ok) return;
                                             await api.workouts.sessions.delete(s.id);
                                             setSessions(prev => prev.filter(x => x.id !== s.id));
                                         }}>
@@ -1709,7 +1721,11 @@ export default function WorkoutsView() {
                                             <Pencil size={14} />
                                         </button>
                                         <button className="btn btn-ghost btn-icon" onClick={async () => {
-                                            if (confirm('Delete this plan?')) { await api.workouts.plans.delete(p.id); load(); }
+                                            const ok = await confirmDialog({
+                                                title: 'Delete this plan?', message: "This can't be undone.",
+                                                confirmLabel: 'Delete', tone: 'danger', icon: <Trash2 size={22} />,
+                                            });
+                                            if (ok) { await api.workouts.plans.delete(p.id); load(); }
                                         }}>
                                             <Trash2 size={14} color="var(--color-text-3)" />
                                         </button>
