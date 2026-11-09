@@ -4,9 +4,45 @@ const BUILT_SHA = import.meta.env.VITE_BUILD_SHA ?? '';
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const VERSION_URL = '/healthwise/version.json';
 
+// Wait until a newly found service worker has taken over (or give up after a timeout)
+function waitForActivation(worker: ServiceWorker, timeoutMs: number): Promise<boolean> {
+    if (worker.state === 'activated') return Promise.resolve(true);
+    return new Promise(resolve => {
+        const timer = setTimeout(() => { worker.removeEventListener('statechange', onChange); resolve(false); }, timeoutMs);
+        function onChange() {
+            if (worker.state === 'activated' || worker.state === 'redundant') {
+                clearTimeout(timer);
+                worker.removeEventListener('statechange', onChange);
+                resolve(worker.state === 'activated');
+            }
+        }
+        worker.addEventListener('statechange', onChange);
+    });
+}
+
+// A plain reload is answered by the PWA service worker's cached copy of the OLD build,
+// so the banner came straight back. Pull in the new service worker first, then reload.
+async function applyUpdateAndReload() {
+    try {
+        const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+        if (reg) {
+            await reg.update().catch(() => {});
+            const incoming = reg.installing || reg.waiting;
+            const activated = incoming ? await waitForActivation(incoming, 10000) : false;
+            if (!activated && 'caches' in window) {
+                // No new worker took over: drop the stale precache so the reload goes to the network
+                const keys = await caches.keys();
+                await Promise.all(keys.filter(k => k.startsWith('workbox-precache')).map(k => caches.delete(k)));
+            }
+        }
+    } catch { /* fall through to a normal reload */ }
+    window.location.reload();
+}
+
 export const VersionBanner: React.FC = () => {
     const lastCheck = useRef(0);
     const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [updating, setUpdating] = useState(false);
 
     const check = async () => {
         const now = Date.now();
@@ -43,10 +79,11 @@ export const VersionBanner: React.FC = () => {
             whiteSpace: 'nowrap', fontFamily: 'Figtree, Inter, sans-serif',
         }}>
             <span style={{ color: '#323338', fontSize: '13px' }}>A new version is available</span>
-            <button onClick={() => window.location.reload()} style={{
+            <button disabled={updating} onClick={() => { setUpdating(true); applyUpdateAndReload(); }} style={{
                 background: '#0073ea', color: '#fff', border: 'none', borderRadius: '6px',
-                padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-            }}>Refresh</button>
+                padding: '6px 14px', fontSize: '12px', fontWeight: 600, cursor: updating ? 'default' : 'pointer',
+                opacity: updating ? 0.7 : 1,
+            }}>{updating ? 'Updating…' : 'Refresh'}</button>
             <button onClick={() => setUpdateAvailable(false)} style={{
                 background: 'none', border: 'none', color: '#676879', cursor: 'pointer',
                 fontSize: '16px', lineHeight: 1, padding: '0 2px',
