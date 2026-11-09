@@ -375,12 +375,54 @@ function ExerciseLogCard({ log, index, expanded, onToggle, onToggleComplete, chi
     );
 }
 
-function ExercisePickerModal({ exercises, existingIds, onPick, onClose }: {
+const EMPTY_NEW_EXERCISE = {
+    name: '',
+    category: 'Strength',
+    trackingType: 'reps_weight' as Exercise['trackingType'],
+    equipment: 'Bodyweight',
+    primaryMuscle: 'Chest',
+    demoVideoUrl: '',
+};
+
+function ExercisePickerModal({ exercises, existingIds, onPick, onCreated, onClose }: {
     exercises: Exercise[]; existingIds: string[];
-    onPick: (ex: Exercise) => Promise<void>; onClose: () => void;
+    onPick: (ex: Exercise) => Promise<void>; onCreated: (ex: Exercise) => void; onClose: () => void;
 }) {
     const [q, setQ] = useState('');
     const [busyId, setBusyId] = useState<string | null>(null);
+    const [showNew, setShowNew] = useState(false);
+    const [newEx, setNewEx] = useState(EMPTY_NEW_EXERCISE);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState('');
+
+    const openCreate = () => {
+        setNewEx({ ...EMPTY_NEW_EXERCISE, name: q.trim() });
+        setCreateError('');
+        setShowNew(true);
+    };
+
+    const createAndAdd = async () => {
+        if (!newEx.name.trim() || creating) return;
+        setCreating(true);
+        setCreateError('');
+        try {
+            const created: Exercise = await api.exercises.create({
+                name: newEx.name.trim(),
+                category: newEx.category,
+                trackingType: newEx.trackingType,
+                equipment: newEx.equipment,
+                primaryMuscle: newEx.primaryMuscle,
+                secondaryMuscles: [],
+                bodyPartFocus: newEx.primaryMuscle,
+                demoVideoUrl: newEx.demoVideoUrl.trim() || null,
+                isSystem: false,
+            });
+            onCreated(created);
+            await onPick(created);
+        } catch {
+            setCreateError("Couldn't create the exercise. Please try again.");
+        } finally { setCreating(false); }
+    };
     const needle = q.trim().toLowerCase();
     const list = exercises.filter(e => !needle
         || e.name.toLowerCase().includes(needle)
@@ -395,18 +437,73 @@ function ExercisePickerModal({ exercises, existingIds, onPick, onClose }: {
                     <h2 style={{ fontSize: '1rem' }}>Add Exercise</h2>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
                 </div>
-                <div style={{ position: 'relative', marginBottom: 10 }}>
-                    <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
-                    <input className="input" placeholder="Search exercises..." value={q}
-                        onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
-                </div>
+                {!showNew && (
+                    <div style={{ position: 'relative', marginBottom: 10 }}>
+                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
+                        <input className="input" placeholder="Search exercises..." value={q}
+                            onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
+                    </div>
+                )}
                 <div style={{ overflowY: 'auto', flex: 1 }}>
-                    {list.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
-                            No exercises found. Add new ones from the Library tab.
+                    {showNew ? (
+                        <div style={{
+                            background: 'var(--color-primary-bg)', borderRadius: 'var(--radius-xl)',
+                            padding: '14px', marginBottom: 10,
+                            border: '1.5px solid var(--color-primary)', display: 'flex', flexDirection: 'column', gap: 12
+                        }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--color-primary)' }}>Create new exercise</div>
+                            <input className="input" placeholder="Exercise name" value={newEx.name}
+                                onChange={e => setNewEx(n => ({ ...n, name: e.target.value }))}
+                                onKeyDown={e => e.key === 'Enter' && createAndAdd()} autoFocus />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                <CustomSelect label="Category" value={newEx.category}
+                                    options={['Strength','Cardio','Flexibility','Balance','Sports','Other'].map(c => ({ value: c, label: c }))}
+                                    onChange={v => setNewEx(n => ({ ...n, category: v }))} />
+                                <CustomSelect label="Muscle Target" value={newEx.primaryMuscle}
+                                    options={['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves','Full Body'].map(m => ({ value: m, label: m }))}
+                                    onChange={v => setNewEx(n => ({ ...n, primaryMuscle: v }))} />
+                                <CustomSelect label="Tracking" value={newEx.trackingType}
+                                    options={[
+                                        { value: 'reps_weight', label: 'Reps + Weight' },
+                                        { value: 'reps_only',   label: 'Reps only' },
+                                        { value: 'time',        label: 'Time' },
+                                        { value: 'distance',    label: 'Distance' },
+                                    ]}
+                                    onChange={v => setNewEx(n => ({ ...n, trackingType: v as Exercise['trackingType'] }))} />
+                                <CustomSelect label="Equipment" value={newEx.equipment}
+                                    options={['Bodyweight','Barbell','Dumbbell','Machine','Cable','Resistance Band','Kettlebell','Other'].map(eq => ({ value: eq, label: eq }))}
+                                    onChange={v => setNewEx(n => ({ ...n, equipment: v }))} />
+                            </div>
+
+                            <div style={{ position: 'relative' }}>
+                                <Link size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)', pointerEvents: 'none' }} />
+                                <input className="input" placeholder="Demo video URL (optional)" value={newEx.demoVideoUrl}
+                                    onChange={e => setNewEx(n => ({ ...n, demoVideoUrl: e.target.value }))}
+                                    style={{ paddingLeft: 34 }} />
+                            </div>
+
+                            {createError && <div style={{ fontSize: '0.8rem', color: 'var(--color-danger)' }}>{createError}</div>}
+
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-ghost btn-sm" onClick={() => setShowNew(false)} disabled={creating}>Cancel</button>
+                                <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}
+                                    onClick={createAndAdd} disabled={creating || !newEx.name.trim()}>
+                                    {creating ? 'Adding...' : 'Create & add to workout'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', marginBottom: 6 }}
+                            onClick={openCreate}>
+                            <Plus size={15} /> {q.trim() ? `Create "${q.trim()}"` : 'Create new exercise'}
+                        </button>
+                    )}
+                    {!showNew && list.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
+                            No exercises match "{q.trim()}". Create it above.
                         </div>
                     )}
-                    {list.map(ex => (
+                    {!showNew && list.map(ex => (
                         <button key={ex.id} disabled={busyId !== null}
                             onClick={async () => { setBusyId(ex.id); try { await onPick(ex); } finally { setBusyId(null); } }}
                             style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, padding: '10px 2px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border-light)', textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
@@ -1834,6 +1931,7 @@ export default function WorkoutsView() {
                     exercises={exercises}
                     existingIds={activeSession.exerciseLogs.map(l => l.exerciseId)}
                     onPick={addExerciseToActive}
+                    onCreated={ex => setExercises(prev => [...prev, ex])}
                     onClose={() => setShowExercisePicker(false)}
                 />
             )}
