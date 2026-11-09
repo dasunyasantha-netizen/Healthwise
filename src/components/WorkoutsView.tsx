@@ -191,13 +191,23 @@ function ExerciseTimer({ onSave }: { onSave: (seconds: number) => void }) {
 
 // ─── SET LOGGER ──────────────────────────────────────────────────────────────
 
-function SetLogger({ logId, sets, trackingType, exerciseName, prevSets, onNotes }: {
+function SetLogger({ logId, sets, trackingType, exerciseName, prevSets, onNotes, onSetsChange }: {
     logId: string; sets: any[]; trackingType: string;
     exerciseName: string; prevSets: any[]; onNotes?: () => void;
+    onSetsChange?: (sets: any[]) => void;
 }) {
     const [localSets, setLocalSets] = useState(sets);
     const [saving, setSaving] = useState(false);
     const [showTimer, setShowTimer] = useState(false);
+
+    // Keep the parent in sync so a collapsed exercise card still shows (and restores) its sets
+    const onSetsChangeRef = useRef(onSetsChange);
+    onSetsChangeRef.current = onSetsChange;
+    const firstSync = useRef(true);
+    useEffect(() => {
+        if (firstSync.current) { firstSync.current = false; return; }
+        onSetsChangeRef.current?.(localSets);
+    }, [localSets]);
 
     const isTime = trackingType === 'time';
 
@@ -296,6 +306,123 @@ function SetLogger({ logId, sets, trackingType, exerciseName, prevSets, onNotes 
             </div>
 
             {showTimer && <ExerciseTimer onSave={saveTimer} />}
+        </div>
+    );
+}
+
+// ─── EXPANDABLE EXERCISE CARD ────────────────────────────────────────────────
+
+function summarizeSets(sets: any[], trackingType: string): string {
+    if (!sets || sets.length === 0) return 'No sets yet';
+    const parts = [`${sets.length} set${sets.length === 1 ? '' : 's'}`];
+    if (trackingType === 'time') {
+        const total = sets.reduce((a, s) => a + (Number(s.timeSeconds) || 0), 0);
+        if (total) parts.push(`${total}s`);
+    } else {
+        const reps = sets.reduce((a, s) => a + (Number(s.reps) || 0), 0);
+        if (reps) parts.push(`${reps} reps`);
+        if (trackingType !== 'reps_only') {
+            const top = sets.reduce((a, s) => Math.max(a, Number(s.weight) || 0), 0);
+            if (top) parts.push(`top ${top} kg`);
+        }
+    }
+    return parts.join(' · ');
+}
+
+function formatSet(set: any, trackingType: string): string {
+    if (trackingType === 'time') return `${set.timeSeconds ?? 0} sec`;
+    if (trackingType === 'reps_only') return `${set.reps ?? '–'} reps`;
+    return `${set.weight ?? 0} kg × ${set.reps ?? '–'}`;
+}
+
+function ExerciseLogCard({ log, index, expanded, onToggle, onToggleComplete, children }: {
+    log: any; index: number; expanded: boolean; onToggle: () => void;
+    onToggleComplete?: () => void; children: React.ReactNode;
+}) {
+    const trackingType = log.exercise?.trackingType ?? 'reps_weight';
+    return (
+        <div style={{
+            marginBottom: 10, borderRadius: 'var(--radius-xl)', background: 'var(--color-surface)',
+            border: `1.5px solid ${expanded ? 'var(--color-primary)' : 'var(--color-border-light)'}`,
+            boxShadow: expanded ? 'var(--shadow-md)' : 'none', transition: 'border-color .15s, box-shadow .15s',
+        }}>
+            <div role="button" aria-expanded={expanded} onClick={onToggle}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px 12px 14px', cursor: 'pointer' }}>
+                <div className="set-num" style={log.completed ? { background: 'var(--color-primary)', color: '#fff' } : undefined}>
+                    {index + 1}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: log.completed && !expanded ? 'var(--color-text-3)' : undefined }}>
+                        {log.exercise?.name}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                        {getMajorGroup(log.exercise?.primaryMuscle ?? '')} · {summarizeSets(log.sets ?? [], trackingType)}
+                    </div>
+                </div>
+                {onToggleComplete ? (
+                    <button className="btn btn-ghost btn-icon" style={{ padding: 4 }} aria-label={log.completed ? 'Mark exercise not done' : 'Mark exercise done'}
+                        onClick={e => { e.stopPropagation(); onToggleComplete(); }}>
+                        <CheckCircle2 size={20} color={log.completed ? 'var(--color-primary)' : 'var(--color-border)'} />
+                    </button>
+                ) : log.completed ? (
+                    <CheckCircle2 size={18} color="var(--color-primary)" />
+                ) : null}
+                <ChevronDown size={16} color="var(--color-text-3)" style={{ flexShrink: 0, transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+            </div>
+            {expanded && <div style={{ padding: '0 14px 14px' }}>{children}</div>}
+        </div>
+    );
+}
+
+function ExercisePickerModal({ exercises, existingIds, onPick, onClose }: {
+    exercises: Exercise[]; existingIds: string[];
+    onPick: (ex: Exercise) => Promise<void>; onClose: () => void;
+}) {
+    const [q, setQ] = useState('');
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const needle = q.trim().toLowerCase();
+    const list = exercises.filter(e => !needle
+        || e.name.toLowerCase().includes(needle)
+        || (e.primaryMuscle ?? '').toLowerCase().includes(needle)
+        || getMajorGroup(e.primaryMuscle ?? '').toLowerCase().includes(needle));
+
+    return (
+        <div className="modal-overlay" onClick={onClose} style={{ alignItems: 'flex-end' }}>
+            <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85dvh', display: 'flex', flexDirection: 'column' }}>
+                <div className="modal-handle" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h2 style={{ fontSize: '1rem' }}>Add Exercise</h2>
+                    <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
+                </div>
+                <div style={{ position: 'relative', marginBottom: 10 }}>
+                    <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-3)' }} />
+                    <input className="input" placeholder="Search exercises..." value={q}
+                        onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {list.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--color-text-3)', fontSize: '0.875rem' }}>
+                            No exercises found. Add new ones from the Library tab.
+                        </div>
+                    )}
+                    {list.map(ex => (
+                        <button key={ex.id} disabled={busyId !== null}
+                            onClick={async () => { setBusyId(ex.id); try { await onPick(ex); } finally { setBusyId(null); } }}
+                            style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, padding: '10px 2px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border-light)', textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}>
+                            <div className="exercise-icon" style={{ width: 36, height: 36, borderRadius: 10 }}><Dumbbell size={16} /></div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ex.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
+                                    {getMajorGroup(ex.primaryMuscle ?? '')}{existingIds.includes(ex.id) ? ' · already in this workout' : ''}
+                                </div>
+                            </div>
+                            {busyId === ex.id
+                                ? <span style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>Adding…</span>
+                                : <Plus size={18} color="var(--color-primary)" />}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
@@ -1225,7 +1352,21 @@ export default function WorkoutsView() {
     const [collapsedSessionIds, setCollapsedSessionIds] = useState<Set<string>>(new Set());
     const [notesModal, setNotesModal] = useState<{ exerciseId: string; exerciseName: string } | null>(null);
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+    const [expandedDoneLogId, setExpandedDoneLogId] = useState<string | null>(null);
+    const [showExercisePicker, setShowExercisePicker] = useState(false);
+    const [reopeningId, setReopeningId] = useState<string | null>(null);
     const today = format(new Date(), 'yyyy-MM-dd');
+
+    // Sessions for the selected day; an in-progress one becomes the active (editable) workout
+    const applySessions = (list: WorkoutSession[]) => {
+        const sorted = list.map(s => ({
+            ...s,
+            exerciseLogs: [...(s.exerciseLogs ?? [])].sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)),
+        }));
+        setSessions(sorted);
+        setActiveSession(sorted.find(s => s.status === 'in_progress') ?? null);
+    };
 
     const load = async () => {
         try {
@@ -1235,7 +1376,7 @@ export default function WorkoutsView() {
                 api.exercises.list()
             ]);
             setPlans(p);
-            setSessions(s);
+            applySessions(s);
             setExercises(e);
         } catch {}
     };
@@ -1243,10 +1384,17 @@ export default function WorkoutsView() {
     useEffect(() => { load(); }, []);
 
     useEffect(() => {
-        api.workouts.sessions.byDate(selectedDate).then(setSessions).catch(() => {});
+        api.workouts.sessions.byDate(selectedDate).then(applySessions).catch(() => {});
         setCollapsedSessionIds(new Set());
-        if (selectedDate !== today) setActiveSession(null);
+        setExpandedDoneLogId(null);
     }, [selectedDate]);
+
+    // Open the first exercise that isn't done yet whenever a workout becomes active
+    useEffect(() => {
+        if (!activeSession) { setExpandedLogId(null); return; }
+        const next = activeSession.exerciseLogs.find(l => !l.completed) ?? activeSession.exerciseLogs[0];
+        setExpandedLogId(next ? next.id : null);
+    }, [activeSession?.id]);
 
     useEffect(() => {
         if (!activeSession) return;
@@ -1255,13 +1403,68 @@ export default function WorkoutsView() {
             for (const log of activeSession.exerciseLogs) {
                 try {
                     const history = await api.workouts.history(log.exerciseId);
-                    if (history.length > 0) map[log.exerciseId] = history[0].sets || [];
+                    const prev = history.find((h: any) => h.workoutSessionId !== activeSession.id);
+                    if (prev) map[log.exerciseId] = prev.sets || [];
                 } catch {}
             }
             setPrevSetsMap(map);
         };
         loadPrev();
     }, [activeSession?.id]);
+
+    const toggleLogComplete = async (logId: string) => {
+        if (!activeSession) return;
+        const log = activeSession.exerciseLogs.find(l => l.id === logId);
+        if (!log) return;
+        const completed = !log.completed;
+        setActiveSession(s => s ? { ...s, exerciseLogs: s.exerciseLogs.map(l => l.id === logId ? { ...l, completed } : l) } : s);
+        // Marking the open exercise done moves you on to the next unfinished one
+        if (completed && expandedLogId === logId) {
+            const next = activeSession.exerciseLogs.find(l => l.id !== logId && !l.completed);
+            setExpandedLogId(next ? next.id : null);
+        }
+        try { await api.workouts.exerciseLogs.update(logId, { completed }); } catch {}
+    };
+
+    const updateActiveLogSets = (logId: string, sets: any[]) => {
+        setActiveSession(s => s ? { ...s, exerciseLogs: s.exerciseLogs.map(l => l.id === logId ? { ...l, sets } : l) } : s);
+    };
+
+    const addExerciseToActive = async (ex: Exercise) => {
+        if (!activeSession) return;
+        try {
+            const log = await api.workouts.sessions.addLog(activeSession.id, {
+                exerciseId: ex.id,
+                orderIndex: activeSession.exerciseLogs.length,
+            });
+            const full = { ...log, exercise: log.exercise ?? ex, sets: log.sets ?? [] };
+            setActiveSession(s => s ? { ...s, exerciseLogs: [...s.exerciseLogs, full] } : s);
+            setExpandedLogId(full.id);
+            setShowExercisePicker(false);
+            const sessionId = activeSession.id;
+            api.workouts.history(ex.id).then(history => {
+                const prev = history.find((h: any) => h.workoutSessionId !== sessionId);
+                if (prev) setPrevSetsMap(m => ({ ...m, [ex.id]: prev.sets || [] }));
+            }).catch(() => {});
+        } catch {
+            alert('Could not add the exercise. Please try again.');
+        }
+    };
+
+    // Undo "Done": put a finished workout back in progress so it can be edited again
+    const reopenSession = async (s: WorkoutSession) => {
+        if (activeSession && activeSession.id !== s.id) {
+            alert('Finish the workout that is in progress before reopening another one.');
+            return;
+        }
+        setReopeningId(s.id);
+        try {
+            await api.workouts.sessions.update(s.id, { status: 'in_progress', endedAt: null });
+            applySessions(await api.workouts.sessions.byDate(s.date));
+        } catch {
+            alert('Could not reopen this workout. Please try again.');
+        } finally { setReopeningId(null); }
+    };
 
     const finishSession = async () => {
         if (!activeSession) return;
@@ -1357,32 +1560,30 @@ export default function WorkoutsView() {
                                 </button>
                             </div>
 
-                            {activeSession.exerciseLogs.map((log) => (
-                                <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise.name}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                                {getMajorGroup(log.exercise.primaryMuscle ?? '')} · {log.exercise.trackingType === 'time' ? 'Time-based' : log.exercise.trackingType === 'reps_only' ? 'Reps only' : 'Reps + Weight'}
-                                            </div>
-                                        </div>
-                                        <button className="btn btn-ghost btn-icon" style={{ padding: 4 }} onClick={async () => {
-                                            await api.workouts.exerciseLogs.update(log.id, { completed: !log.completed });
-                                            setActiveSession(s => s ? { ...s, exerciseLogs: s.exerciseLogs.map(l => l.id === log.id ? { ...l, completed: !l.completed } : l) } : s);
-                                        }}>
-                                            <CheckCircle2 size={20} color={log.completed ? 'var(--color-primary)' : 'var(--color-border)'} />
-                                        </button>
-                                    </div>
+                            {activeSession.exerciseLogs.map((log, i) => (
+                                <ExerciseLogCard
+                                    key={log.id}
+                                    log={log}
+                                    index={i}
+                                    expanded={expandedLogId === log.id}
+                                    onToggle={() => setExpandedLogId(id => id === log.id ? null : log.id)}
+                                    onToggleComplete={() => toggleLogComplete(log.id)}>
                                     <SetLogger
                                         logId={log.id}
-                                        sets={log.sets}
+                                        sets={log.sets ?? []}
                                         trackingType={log.exercise.trackingType}
                                         exerciseName={log.exercise.name}
                                         prevSets={prevSetsMap[log.exerciseId] || []}
                                         onNotes={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise.name })}
+                                        onSetsChange={sets => updateActiveLogSets(log.id, sets)}
                                     />
-                                </div>
+                                </ExerciseLogCard>
                             ))}
+
+                            <button className="btn btn-secondary" style={{ width: '100%', marginTop: 4 }}
+                                onClick={() => setShowExercisePicker(true)}>
+                                <Plus size={15} /> Add Exercise
+                            </button>
                         </div>
                     )}
 
@@ -1406,7 +1607,15 @@ export default function WorkoutsView() {
                                             {s.exerciseLogs.length} exercises
                                         </div>
                                     </div>
-                                    <span className="badge badge-green" style={{ flexShrink: 0 }}><CheckCircle2 size={12} /> Done</span>
+                                    <button className="badge badge-green" title="Tap to undo Done and keep editing"
+                                        style={{ flexShrink: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                                        disabled={reopeningId === s.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Undo "Done" and reopen this workout so you can add more exercises or sets?')) reopenSession(s);
+                                        }}>
+                                        <CheckCircle2 size={12} /> {reopeningId === s.id ? 'Reopening…' : 'Done'}
+                                    </button>
                                     <button className="btn btn-ghost btn-icon" style={{ padding: 4, color: '#ef4444', flexShrink: 0 }}
                                         onClick={async (e) => {
                                             e.stopPropagation();
@@ -1419,28 +1628,39 @@ export default function WorkoutsView() {
                                     <ChevronDown size={16} color="var(--color-text-3)" style={{ flexShrink: 0, transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform .2s' }} />
                                 </div>
 
-                                {/* Exercises with editable sets */}
-                                {!collapsed && s.exerciseLogs.map((log: any) => (
-                                    <div key={log.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border-light)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{log.exercise?.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-3)' }}>
-                                                    {getMajorGroup(log.exercise?.primaryMuscle ?? '')}
+                                {/* Exercises — tap a card to see its sets */}
+                                {!collapsed && s.exerciseLogs.map((log: any, i: number) => (
+                                    <ExerciseLogCard
+                                        key={log.id}
+                                        log={log}
+                                        index={i}
+                                        expanded={expandedDoneLogId === log.id}
+                                        onToggle={() => setExpandedDoneLogId(id => id === log.id ? null : log.id)}>
+                                        {(log.sets ?? []).length === 0 ? (
+                                            <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-3)', marginBottom: 8 }}>No sets recorded.</div>
+                                        ) : (log.sets ?? []).map((set: any) => (
+                                            <div key={set.id} className="set-row">
+                                                <div className="set-num">{set.setNumber}</div>
+                                                <div style={{ flex: 1, fontWeight: 600, fontSize: '0.9375rem' }}>
+                                                    {formatSet(set, log.exercise?.trackingType ?? 'reps_weight')}
                                                 </div>
+                                                {set.completed && <CheckCircle2 size={16} color="var(--color-primary)" />}
                                             </div>
-                                            <CheckCircle2 size={18} color="var(--color-primary)" />
-                                        </div>
-                                        <SetLogger
-                                            logId={log.id}
-                                            sets={log.sets ?? []}
-                                            trackingType={log.exercise?.trackingType ?? 'reps_weight'}
-                                            exerciseName={log.exercise?.name ?? ''}
-                                            prevSets={[]}
-                                            onNotes={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}
-                                        />
-                                    </div>
+                                        ))}
+                                        <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }}
+                                            onClick={() => setNotesModal({ exerciseId: (log.exercise?.id || log.exerciseId) as string, exerciseName: log.exercise?.name ?? '' })}>
+                                            Notes
+                                        </button>
+                                    </ExerciseLogCard>
                                 ))}
+
+                                {!collapsed && (
+                                    <button className="btn btn-secondary" style={{ width: '100%', marginTop: 4 }}
+                                        disabled={reopeningId === s.id}
+                                        onClick={() => reopenSession(s)}>
+                                        <RotateCcw size={15} /> {reopeningId === s.id ? 'Reopening…' : 'Reopen to add exercises or sets'}
+                                    </button>
+                                )}
                             </div>
                         );
                     })}
@@ -1593,6 +1813,14 @@ export default function WorkoutsView() {
             {showBuilder && <WorkoutPlanBuilder onClose={() => { setShowBuilder(false); setEditingPlan(undefined); }} onSaved={load} editing={editingPlan} />}
             {selectedExercise && <ExerciseDetailModal exercise={selectedExercise} onClose={() => setSelectedExercise(null)} />}
             {notesModal && <ExerciseNotesModal exerciseId={notesModal.exerciseId} exerciseName={notesModal.exerciseName} onClose={() => setNotesModal(null)} />}
+            {showExercisePicker && activeSession && (
+                <ExercisePickerModal
+                    exercises={exercises}
+                    existingIds={activeSession.exerciseLogs.map(l => l.exerciseId)}
+                    onPick={addExerciseToActive}
+                    onClose={() => setShowExercisePicker(false)}
+                />
+            )}
         </div>
     );
 }
